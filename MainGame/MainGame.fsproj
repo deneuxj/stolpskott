@@ -61,6 +61,7 @@
     <Compile Include="Player.fs" />
     <Compile Include="Physics.fs" />
     <Compile Include="Team.fs" />
+    <Compile Include="Rendering.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>
@@ -68,6 +69,9 @@
     <Reference Include="Microsoft.Xna.Framework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=842cf8be1de50553" />
     <Reference Include="Microsoft.Xna.Framework.Game">
       <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Microsoft XNA\XNA Game Studio\v4.0\References\Windows\x86\Microsoft.Xna.Framework.Game.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Xna.Framework.Graphics">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Microsoft XNA\XNA Game Studio\v4.0\References\Windows\x86\Microsoft.Xna.Framework.Graphics.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core" />
