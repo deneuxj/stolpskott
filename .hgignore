@@ -1,0 +1,9 @@
+syntax: regexp
+MainGame/bin/.*
+MainGame/obj/.*$
+[.]suo$
+StolpSkott/StolpSkott/bin/
+StolpSkott/StolpSkott/obj/
+StolpSkott/StolpSkottContent/obj/
+syntax: glob
+StolpSkott/StolpSkott/StolpSkott.csproj.user
