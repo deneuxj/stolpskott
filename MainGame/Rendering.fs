@@ -107,6 +107,7 @@ let renderLines
         let x1', y1' = worldToScreen (x0 + lineHalfWidth, y1 + lineHalfWidth)
         sb.Draw(whiteLine, Rectangle(int x0', int y0', int (x1' - x0'), int (y1' - y0')), Color.White)
 
+    // Outer lines, middle line.
     let x0 = -pitch.width / 2.0f
     let x1 = -x0
     let y0 = -pitch.length / 2.0f
@@ -119,10 +120,60 @@ let renderLines
     drawVLine (x0, y0) y1
     drawVLine (x1, y0) y1
 
-    // TODO: penalty boxes, six-yards boxes
+    // upper penalty box
+    let x0 = -Team.penaltyBoxWidth / 2.0f
+    let x1 = -x0
+    let y0 = pitch.length / 2.0f
+    let y1 = y0 - Team.penaltyBoxHeight
+
+    drawHLine (x0, y0) y1
+    drawHLine (x1, y0) y1
+    drawVLine (x0, y1) x1
+
+    // lower penalty box
+    let y0 = -pitch.length / 2.0f
+    let y1 = y0 + Team.penaltyBoxHeight
+
+    drawHLine (x0, y0) y1
+    drawHLine (x1, y0) y1
+    drawVLine (x0, y1) x1
+
+    // upper six-yards box
+    let x0 = -Team.goalBoxWidth / 2.0f
+    let x1 = -x0
+    let y0 = pitch.length / 2.0f
+    let y1 = y0 - Team.goalBoxHeight
+
+    drawHLine (x0, y0) y1
+    drawHLine (x1, y0) y1
+    drawVLine (x0, y1) x1
+
+    // lower six-yards box
+    let x0 = -Team.goalBoxWidth / 2.0f
+    let x1 = -x0
+    let y0 = -pitch.length / 2.0f
+    let y1 = y0 + Team.goalBoxHeight
+
+    drawHLine (x0, y0) y1
+    drawHLine (x1, y0) y1
+    drawVLine (x0, y1) x1
 
 
-let render renderLines renderPlayerShadows renderBallShadow renderGoalShadows renderSprites (sb : SpriteBatch) viewSize resources (state : Team.GameState) : unit =
+let testRender(sb : SpriteBatch, darkGrass, lightGrass, line, x, y) =
+    let viewSize =
+        let viewWidth = 30.0f<m>
+        let viewHeight = viewWidth * 9.0f / 16.0f
+        (viewWidth, viewHeight)
+    
+    sb.Begin()
+    try
+        renderGrass sb viewSize darkGrass lightGrass (x, y)
+        renderLines sb viewSize line { width = 68.0f<m> ; length = 105.0f<m> } (x, y)
+    finally
+        sb.End()
+
+
+let render renderPlayerShadows renderBallShadow renderGoalShadows renderSprites (sb : SpriteBatch) viewSize resources (state : Team.GameState) : unit =
     let viewPos = 
         let viewX = state.ball.pos.X |> max (-state.pitch.width * 0.5f) |> min (state.pitch.width * 0.5f)
         let viewY = state.ball.pos.Y |> max (-state.pitch.length * 0.5f) |> min (state.pitch.length * 0.5f)
@@ -131,9 +182,9 @@ let render renderLines renderPlayerShadows renderBallShadow renderGoalShadows re
     let sprites =
         seq {
             for player in state.teamA.onPitch do
-                yield { x = player.pos.X ; y = player.pos.Y; spriteType = Player(player, Team.TeamA) }
+                yield { x = player.pos.X ; y = player.pos.Y ; spriteType = Player(player, Team.TeamA) }
             for player in state.teamB.onPitch do
-                yield { x = player.pos.X ; y = player.pos.Y; spriteType = Player(player, Team.TeamB) }
+                yield { x = player.pos.X ; y = player.pos.Y ; spriteType = Player(player, Team.TeamB) }
             yield { x = 0.0f<m> ; y = state.pitch.length * 0.5f ; spriteType = GoalUpper }
             yield { x = 0.0f<m> ; y = -state.pitch.length * 0.5f ; spriteType = GoalLower }
             yield { x = state.ball.pos.X ; y = state.ball.pos.Y ; spriteType = Ball(state.ball.pos.Z) }
