@@ -36,6 +36,11 @@ let transform sx sy tx ty pos =
     { x = pos.x * sx + tx
       y = pos.y * sy + ty }
 
+let penaltyBoxWidth = 40.3f<m>
+let penaltyBoxHeight = 16.5f<m>
+let goalBoxWidth = penaltyBoxWidth - 22.0f<m>
+let goalBoxHeight = 5.5f<m>
+
 type PitchTraits =
     { width : float32<m>
       length : float32<m>
