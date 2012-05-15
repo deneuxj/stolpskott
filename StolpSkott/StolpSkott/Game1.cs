@@ -16,6 +16,9 @@ namespace StolpSkott {
   public class Game1 : Microsoft.Xna.Framework.Game {
     GraphicsDeviceManager graphics;
     SpriteBatch spriteBatch;
+    Texture2D darkGrass;
+    Texture2D lightGrass;
+    Texture2D white;
 
     public Game1() {
       graphics = new GraphicsDeviceManager(this);
@@ -43,6 +46,9 @@ namespace StolpSkott {
       spriteBatch = new SpriteBatch(GraphicsDevice);
 
       // TODO: use this.Content to load your game content here
+      darkGrass = Content.Load<Texture2D>("grass-dark");
+      lightGrass = Content.Load<Texture2D>("grass-light");
+      white = Content.Load<Texture2D>("white");
     }
 
     /// <summary>
@@ -76,7 +82,7 @@ namespace StolpSkott {
       GraphicsDevice.Clear(Color.CornflowerBlue);
 
       // TODO: Add your drawing code here
-
+      CleverRake.StolpSkott.Rendering.testRender(spriteBatch, darkGrass, lightGrass, white, 0.0f, 0.0f);
       base.Draw(gameTime);
     }
   }
