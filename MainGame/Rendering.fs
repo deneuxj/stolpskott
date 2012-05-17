@@ -95,7 +95,7 @@ let renderLines
     (viewX : float32<m>, viewY : float32<m>) =
 
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
-    let lineHalfWidth = 0.5f * 0.1f<m>
+    let lineHalfWidth = 0.5f * 0.14f<m>
     let drawHLine (x0, y0) (x1) =
         let x0, x1 = min x0 x1, max x0 x1
         let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
@@ -160,21 +160,56 @@ let renderLines
     drawHLine (x0, y1) x1
 
 
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, x, y) =
+let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper goalLower (pitch : Team.PitchTraits) (viewX, viewY) sprites =
+    let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
+    
+    for s in sprites do
+        match s with
+        | { spriteType = Ball h ; x = x ; y = y } ->
+            let scale = 1.0f + h / 30.0f<m>
+            let scaledRadius = scale * Ball.ballRadius
+            let x = x - scaledRadius
+            let y = y + scaledRadius
+            let x, y = worldToScreen (x, y)
+            let w = 2.0f * scaledRadius * ratio |> int
+            sb.Draw(ball, Rectangle(int x, int y, w, w), Color.White)
+
+        | { spriteType = Player(player, side) } ->
+            let x = player.pos.X
+            let y = player.pos.Y
+            let playerRadius = 0.5f<m>
+            let x, y = worldToScreen (x - playerRadius, y + playerRadius)
+            let w = 2.0f * playerRadius * ratio |> int
+            let sx, sy =
+                match player.activity with
+                | _ -> 0, 0
+            let sw = 64
+            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White)
+        | { spriteType = GoalUpper } ->
+            let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
+            sb.Draw(goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
+        | { spriteType = GoalLower } ->
+            let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
+            sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
+
+
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, x, y) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
+    let pitch : Team.PitchTraits = { width = 68.0f<m> ; length = 105.0f<m> }
     sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
-        renderLines sb viewSize line { width = 68.0f<m> ; length = 105.0f<m> } (x, y)
+        renderLines sb viewSize line pitch (x, y)
+        renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) [| { spriteType = GoalUpper ; x = 0.0f<m> ; y = 0.0f<m> } ; { spriteType = GoalLower ; x = 0.0f<m> ; y = 0.0f<m> } |]
     finally
         sb.End()
 
 
-let render renderPlayerShadows renderBallShadow renderGoalShadows renderSprites (sb : SpriteBatch) viewSize resources (state : Team.GameState) : unit =
+let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBatch) viewSize resources (state : Team.GameState) : unit =
     let viewPos = 
         let viewX = state.ball.pos.X |> max (-state.pitch.width * 0.5f) |> min (state.pitch.width * 0.5f)
         let viewY = state.ball.pos.Y |> max (-state.pitch.length * 0.5f) |> min (state.pitch.length * 0.5f)
@@ -190,7 +225,7 @@ let render renderPlayerShadows renderBallShadow renderGoalShadows renderSprites 
             yield { x = 0.0f<m> ; y = -state.pitch.length * 0.5f ; spriteType = GoalLower }
             yield { x = state.ball.pos.X ; y = state.ball.pos.Y ; spriteType = Ball(state.ball.pos.Z) }
         }
-        |> Seq.sortBy (function { x = x ; y = y } -> (y, x))
+        |> Seq.sortBy (function { x = x ; y = y } -> (-y, x))
 
     try
         sb.Begin()
@@ -199,6 +234,6 @@ let render renderPlayerShadows renderBallShadow renderGoalShadows renderSprites 
         renderPlayerShadows sb viewSize resources.playerShadows viewPos (Array.concat [state.teamA.onPitch ; state.teamB.onPitch])
         renderBallShadow sb viewSize resources.ballShadow viewPos state.ball.pos
         renderGoalShadows sb viewSize resources.goalShadows viewPos
-        renderSprites sb viewSize resources.ball resources.playerSprites resources.goalUpper resources.goalLower viewPos sprites
+        renderSprites sb viewSize resources.ball resources.playerSprites resources.goalUpper resources.goalLower state.pitch viewPos sprites
     finally
         sb.End()

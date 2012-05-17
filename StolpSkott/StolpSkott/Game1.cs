@@ -19,6 +19,10 @@ namespace StolpSkott {
     Texture2D darkGrass;
     Texture2D lightGrass;
     Texture2D white;
+    Texture2D players;
+    Texture2D ball;
+    Texture2D goalUpper;
+    Texture2D goalLower;
     float x = 0.0f;
     float y = 0.0f;
 
@@ -51,6 +55,10 @@ namespace StolpSkott {
       darkGrass = Content.Load<Texture2D>("grass-dark");
       lightGrass = Content.Load<Texture2D>("grass-light");
       white = Content.Load<Texture2D>("white");
+      players = Content.Load<Texture2D>("player");
+      goalLower = Content.Load<Texture2D>("goal-bottom");
+      goalUpper = Content.Load<Texture2D>("goal-top");
+      ball = Content.Load<Texture2D>("ball");
     }
 
     /// <summary>
@@ -87,7 +95,7 @@ namespace StolpSkott {
       GraphicsDevice.Clear(Color.CornflowerBlue);
 
       // TODO: Add your drawing code here
-      CleverRake.StolpSkott.Rendering.testRender(this.GraphicsDevice, spriteBatch, darkGrass, lightGrass, white, x, y);
+      CleverRake.StolpSkott.Rendering.testRender(this.GraphicsDevice, spriteBatch, darkGrass, lightGrass, white, ball, players, goalUpper, goalLower, x, y);
       base.Draw(gameTime);
     }
   }
