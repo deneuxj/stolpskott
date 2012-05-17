@@ -71,16 +71,17 @@ let renderGrass (sb : SpriteBatch) (viewWidth : float32<m>, viewHeight : float32
             else
                 let strip = (y0, y1, not stripIsDark)
                 Some (strip, (y0, not stripIsDark)))
-            (0.0f<m>, true)
+            (0.0f<m>, false)
 
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
+
     Seq.append upperStrips lowerStrips
     |> Seq.iter (fun (y0, y1, stripIsDark) ->
         let x, y =
             if stripIsDark then
-                (-darkStripWidth * 0.5f, y0)
+                (-darkStripWidth * 0.5f, y1)
             else
-                (-lightStripWidth * 0.5f, y0)
+                (-lightStripWidth * 0.5f, y1)
             |> worldToScreen
 
         sb.Draw((if stripIsDark then darkGrass else lightGrass), Vector2(x / 1.0f<px>, y / 1.0f<px>), Color.White))
@@ -99,13 +100,13 @@ let renderLines
         let x0, x1 = min x0 x1, max x0 x1
         let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
         let x1', y1' = worldToScreen (x1 + lineHalfWidth, y0 + lineHalfWidth)
-        sb.Draw(whiteLine, Rectangle(int x0', int y0', int (x1' - x0'), int (y1' - y0')), Color.White)
+        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), Color.White)
 
     let drawVLine (x0, y0) (y1) =
         let y0, y1 = min y0 y1, max y0 y1
         let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
         let x1', y1' = worldToScreen (x0 + lineHalfWidth, y1 + lineHalfWidth)
-        sb.Draw(whiteLine, Rectangle(int x0', int y0', int (x1' - x0'), int (y1' - y0')), Color.White)
+        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), Color.White)
 
     // Outer lines, middle line.
     let x0 = -pitch.width / 2.0f
@@ -126,17 +127,17 @@ let renderLines
     let y0 = pitch.length / 2.0f
     let y1 = y0 - Team.penaltyBoxHeight
 
-    drawHLine (x0, y0) y1
-    drawHLine (x1, y0) y1
-    drawVLine (x0, y1) x1
+    drawVLine (x0, y0) y1
+    drawVLine (x1, y0) y1
+    drawHLine (x0, y1) x1
 
     // lower penalty box
     let y0 = -pitch.length / 2.0f
     let y1 = y0 + Team.penaltyBoxHeight
 
-    drawHLine (x0, y0) y1
-    drawHLine (x1, y0) y1
-    drawVLine (x0, y1) x1
+    drawVLine (x0, y0) y1
+    drawVLine (x1, y0) y1
+    drawHLine (x0, y1) x1
 
     // upper six-yards box
     let x0 = -Team.goalBoxWidth / 2.0f
@@ -144,9 +145,9 @@ let renderLines
     let y0 = pitch.length / 2.0f
     let y1 = y0 - Team.goalBoxHeight
 
-    drawHLine (x0, y0) y1
-    drawHLine (x1, y0) y1
-    drawVLine (x0, y1) x1
+    drawVLine (x0, y0) y1
+    drawVLine (x1, y0) y1
+    drawHLine (x0, y1) x1
 
     // lower six-yards box
     let x0 = -Team.goalBoxWidth / 2.0f
@@ -154,18 +155,18 @@ let renderLines
     let y0 = -pitch.length / 2.0f
     let y1 = y0 + Team.goalBoxHeight
 
-    drawHLine (x0, y0) y1
-    drawHLine (x1, y0) y1
-    drawVLine (x0, y1) x1
+    drawVLine (x0, y0) y1
+    drawVLine (x1, y0) y1
+    drawHLine (x0, y1) x1
 
 
-let testRender(sb : SpriteBatch, darkGrass, lightGrass, line, x, y) =
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, x, y) =
     let viewSize =
-        let viewWidth = 30.0f<m>
-        let viewHeight = viewWidth * 9.0f / 16.0f
+        let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
+        let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
-    sb.Begin()
+    sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
         renderLines sb viewSize line { width = 68.0f<m> ; length = 105.0f<m> } (x, y)

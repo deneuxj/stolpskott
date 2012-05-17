@@ -19,6 +19,8 @@ namespace StolpSkott {
     Texture2D darkGrass;
     Texture2D lightGrass;
     Texture2D white;
+    float x = 0.0f;
+    float y = 0.0f;
 
     public Game1() {
       graphics = new GraphicsDeviceManager(this);
@@ -70,7 +72,10 @@ namespace StolpSkott {
         this.Exit();
 
       // TODO: Add your update logic here
+      float k = 10.0f * (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+      x += GamePad.GetState(PlayerIndex.One).ThumbSticks.Left.X * k;
+      y += GamePad.GetState(PlayerIndex.One).ThumbSticks.Left.Y * k;
       base.Update(gameTime);
     }
 
@@ -82,7 +87,7 @@ namespace StolpSkott {
       GraphicsDevice.Clear(Color.CornflowerBlue);
 
       // TODO: Add your drawing code here
-      CleverRake.StolpSkott.Rendering.testRender(spriteBatch, darkGrass, lightGrass, white, 0.0f, 0.0f);
+      CleverRake.StolpSkott.Rendering.testRender(this.GraphicsDevice, spriteBatch, darkGrass, lightGrass, white, x, y);
       base.Draw(gameTime);
     }
   }
