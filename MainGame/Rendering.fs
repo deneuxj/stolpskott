@@ -212,7 +212,7 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
     for s in sprites do
         match s with
         | Ball b ->
-            let scale = 1.0f + b.pos.Z / 30.0f<m>
+            let scale = 1.0f + b.pos.Z / 2.5f<m>
             let scaledRadius = scale * Ball.ballRadius
             let x = b.pos.X - scaledRadius
             let y = b.pos.Y + scaledRadius
@@ -246,13 +246,13 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
 
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, playerState : Player.State, ballState) =
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, playerState : Player.State, ballState : Ball.State) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
-    let x, y = playerState.pos.X, playerState.pos.Y
+    let x, y = ballState.pos.X, ballState.pos.Y
 
     sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
     try

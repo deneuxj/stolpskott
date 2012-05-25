@@ -51,32 +51,32 @@ let updateKeyFrame (dt : float32<s>) player =
         | Standing -> Standing
         | Trapping -> Trapping
         | Jumping kf ->
-            let kf = kf - 1.0f<kf> * dt / jumpingLength
-            if kf > 0.0f<kf> then 
+            let kf = kf + 1.0f<kf> * dt / jumpingLength
+            if kf < 1.0f<kf> then 
                 Jumping kf
             else
                 Standing
         | Tackling (kf, touchedBall) ->
-            let kf = kf - 1.0f<kf> * dt / tacklingLength
-            if kf > 0.0f<kf> then
+            let kf = kf + 1.0f<kf> * dt / tacklingLength
+            if kf < 1.0f<kf> then
                 Tackling(kf, touchedBall)
             else
                 Standing
         | Kicking kf ->
-            let kf = kf - 1.0f<kf> * dt / kickingLength 
-            if kf > 0.0f<kf> then
+            let kf = kf + 1.0f<kf> * dt / kickingLength 
+            if kf < 1.0f<kf> then
                 Kicking kf
             else
                 Standing
         | Fallen kf ->
-            let kf = kf - 1.0f<kf> * dt / fallenLength
-            if kf > 0.0f<kf> then
+            let kf = kf + 1.0f<kf> * dt / fallenLength
+            if kf < 1.0f<kf> then
                 Fallen kf
             else
                 Standing
         | KeeperDive kf ->
-            let kf = kf - 1.0f<kf> * dt / keeperDiveLength
-            if kf > 0.0f<kf> then
+            let kf = kf + 1.0f<kf> * dt / keeperDiveLength
+            if kf < 1.0f<kf> then
                 KeeperDive kf
             else
                 Standing

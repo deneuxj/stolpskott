@@ -37,6 +37,7 @@ let (|SomeImpulse|_|) =
     | Free -> None
 
 let controlMaxDistance = 1.0f<m> // Beyond this distance, balls don't collide with players.
+let kickMaxDistance = 1.5f<m>
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
@@ -53,53 +54,72 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
     let relPos = ballPos2d - player.pos
     let relSpeed = ballSpeed2d - player.speed * player.direction
 
-    match TypedVector.dot2(relPos, relSpeed) with
-    | x when x < 0.0f<m^2/s> ->
-        let jump =
-            match player.activity with
-            | Player.Jumping _ -> Player.jumpHeight
-            | _ -> 0.0f<m>
+    let isBallGoingTowardsPlayer =
+        TypedVector.dot2(relPos, relSpeed) < 0.0f<m^2/s>
 
-        if ball.pos.Z - Ball.ballRadius <= player.traits.length + jump then
-            let dist = relPos.Length
-            if dist < controlMaxDistance then
-                match player.activity with
-                | Player.Trapping ->
-                    Trapped(playerId)
+    let jump =
+        match player.activity with
+        | Player.Jumping _ -> Player.jumpHeight
+        | _ -> 0.0f<m>
 
-                | Player.Fallen _ ->
-                    Free
+    if ball.pos.Z - Ball.ballRadius <= player.traits.length + jump then
+        let dist = relPos.Length
 
-                | Player.Jumping _ ->
-                    BouncedOffPlayer(playerId, headerSpeed * vector3Of2 player.direction)
-
-                | Player.Kicking _ ->
-                    Kicked(playerId, collideLightWithHeavy playerBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
-                
-                | Player.Tackling _ ->
-                    BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
-
-                | Player.KeeperDive keyframe ->
-                    if abs(keyframe - optimalKeeperKeyframe) < keeperCaughtThreshold then
-                        Trapped(playerId)
-                    else
-                        BouncedOffPlayer(playerId, collideLightWithHeavy keeperBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
-
-                | Player.Standing _ ->
-                    let canControl =
-                        player.speed > 0.0f<m/s> &&
-                        TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
-                        relSpeed.Length < maxBallControlSpeed * player.traits.ballControl
-
-                    if canControl then                        
-                        Pushed(playerId, player.speed * pushSpeedFactor * (2.0f - player.traits.ballControl) * (vector3Of2 player.direction))
-                    else
-                        BouncedOffPlayer(playerId, collideLightWithHeavy playerBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+        match player.activity with
+        | Player.Trapping ->
+            if dist < 2.0f * controlMaxDistance then
+                Trapped(playerId)
             else
                 Free
-        else
+
+        | Player.Fallen _ ->
             Free
-    | _ -> Free
+
+        | Player.Jumping _ ->
+            if isBallGoingTowardsPlayer && dist < controlMaxDistance then
+                BouncedOffPlayer(playerId, headerSpeed * vector3Of2 player.direction)
+            else
+                Free
+
+        | Player.Kicking kf ->
+            if isBallGoingTowardsPlayer && dist < kickMaxDistance then
+                let kickHeight =
+                    10.0f<m/s> * MathHelper.Lerp(1.0f, 0.5f, player.traits.ballControl)
+                let kickSpeed =
+                    50.0f<m/s>
+                let kick =
+                    kickSpeed * TypedVector3<1>(player.direction.X, player.direction.Y, 0.0f)
+                    + TypedVector3<m/s>(0.0f<_>, 0.0f<_>, kickHeight)
+                Kicked(playerId, kick)
+            else
+                Free
+                
+        | Player.Tackling _ ->
+            if isBallGoingTowardsPlayer && dist < controlMaxDistance then
+                BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+            else
+                Free
+
+        | Player.KeeperDive keyframe ->
+            if abs(keyframe - optimalKeeperKeyframe) < keeperCaughtThreshold && dist < controlMaxDistance then
+                Trapped(playerId)
+            elif isBallGoingTowardsPlayer && dist < controlMaxDistance then
+                BouncedOffPlayer(playerId, collideLightWithHeavy keeperBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+            else
+                Free
+
+        | Player.Standing _ ->
+            let canControl =
+                player.speed > 0.0f<m/s> &&
+                TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
+                relSpeed.Length < maxBallControlSpeed * MathHelper.Lerp(0.8f, 1.0f, player.traits.ballControl)
+
+            if canControl && isBallGoingTowardsPlayer && dist < 0.5f * controlMaxDistance then                        
+                Pushed(playerId, player.speed * pushSpeedFactor * (2.0f - player.traits.ballControl) * (vector3Of2 player.direction))
+            else
+                Free
+    else
+        Free
 
 
 let collidePlayersWithBall ball players =

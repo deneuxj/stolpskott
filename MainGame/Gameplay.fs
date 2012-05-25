@@ -54,7 +54,6 @@ type TrainingGameplay(game, content : Content.ContentManager) =
                   inPlay = Ball.InPlay
                 }
         }
-    let hasBallControl = ref false
     let controller = ref Controls.Running
 
     override this.LoadContent() =
@@ -75,12 +74,20 @@ type TrainingGameplay(game, content : Content.ContentManager) =
 
     override this.Update(gt) =
         let dt = 1.0f<s> * float32 gt.ElapsedGameTime.TotalSeconds
+        let hasBallControl =
+            (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f * Physics.controlMaxDistance
         let control, playerState =
-            Controls.updateControl config (Input.GamePad.GetState(PlayerIndex.One)) hasBallControl.Value (state.Value.ball.pos.Z > 1.5f<m>) (controller.Value, state.Value.player)
+            Controls.updateControl config (Input.GamePad.GetState(PlayerIndex.One)) hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) (controller.Value, state.Value.player)
         let playerState = Player.updateKeyFrame dt playerState
         let playerState = Player.updatePlayer dt playerState
         
         let ballState, impulse = Physics.updateBall goalCenters dt [| ((Team.TeamA, 0), playerState) |] state.Value.ball
+        let ballState =
+            match impulse with
+            | Physics.Trapped owner when owner = (Team.TeamA, 0) ->
+                { ballState with pos = TypedVector3<m>(playerState.pos.X, playerState.pos.Y, Ball.ballRadius) }
+            | _ -> ballState
+            |> Team.boundBall pitch
 
         controller := control
         state := { state.Value with player = playerState ; ball = ballState }
