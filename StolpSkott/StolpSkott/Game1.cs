@@ -25,6 +25,7 @@ namespace StolpSkott {
     Texture2D goalLower;
     float x = 0.0f;
     float y = 0.0f;
+    DrawableGameComponent gameplay;
 
     public Game1() {
       graphics = new GraphicsDeviceManager(this);
@@ -39,7 +40,8 @@ namespace StolpSkott {
     /// </summary>
     protected override void Initialize() {
       // TODO: Add your initialization logic here
-
+      gameplay = new CleverRake.StolpSkott.Gameplay.TrainingGameplay(this, this.Content);
+      this.Components.Add(gameplay);
       base.Initialize();
     }
 
@@ -95,7 +97,6 @@ namespace StolpSkott {
       GraphicsDevice.Clear(Color.CornflowerBlue);
 
       // TODO: Add your drawing code here
-      CleverRake.StolpSkott.Rendering.testRender(this.GraphicsDevice, spriteBatch, darkGrass, lightGrass, white, ball, players, goalUpper, goalLower, x, y);
       base.Draw(gameTime);
     }
   }

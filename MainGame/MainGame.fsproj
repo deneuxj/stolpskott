@@ -57,11 +57,12 @@
   <ItemGroup>
     <Compile Include="Units.fs" />
     <Compile Include="Ball.fs" />
-    <Compile Include="Controls.fs" />
     <Compile Include="Player.fs" />
+    <Compile Include="Controls.fs" />
     <Compile Include="Physics.fs" />
     <Compile Include="Team.fs" />
     <Compile Include="Rendering.fs" />
+    <Compile Include="Gameplay.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>

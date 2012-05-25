@@ -28,6 +28,8 @@ type State =
     { pos : TypedVector2<m>
       direction : TypedVector2<1>
       speed : float32<m/s>
+      travelled : float32<m> // To decide the frame to use when rendering running players
+      runningFrame : int
       activity : Activity
       traits : Traits
       isKeeper : bool
@@ -36,3 +38,85 @@ type State =
 
 let getRunSpeed { traits = { speed = speed }; health = health; condition = condition } =
     speed * health * condition / 1.0f<he sta>
+
+let updateKeyFrame (dt : float32<s>) player =
+    let jumpingLength = 0.5f<s>
+    let tacklingLength = 0.75f<s>
+    let kickingLength = 0.2f<s>
+    let fallenLength = 1.0f<s>
+    let keeperDiveLength = 0.75f<s>
+
+    let activity =
+        match player.activity with
+        | Standing -> Standing
+        | Trapping -> Trapping
+        | Jumping kf ->
+            let kf = kf - 1.0f<kf> * dt / jumpingLength
+            if kf > 0.0f<kf> then 
+                Jumping kf
+            else
+                Standing
+        | Tackling (kf, touchedBall) ->
+            let kf = kf - 1.0f<kf> * dt / tacklingLength
+            if kf > 0.0f<kf> then
+                Tackling(kf, touchedBall)
+            else
+                Standing
+        | Kicking kf ->
+            let kf = kf - 1.0f<kf> * dt / kickingLength 
+            if kf > 0.0f<kf> then
+                Kicking kf
+            else
+                Standing
+        | Fallen kf ->
+            let kf = kf - 1.0f<kf> * dt / fallenLength
+            if kf > 0.0f<kf> then
+                Fallen kf
+            else
+                Standing
+        | KeeperDive kf ->
+            let kf = kf - 1.0f<kf> * dt / keeperDiveLength
+            if kf > 0.0f<kf> then
+                KeeperDive kf
+            else
+                Standing
+
+    { player with activity = activity }
+
+let updatePlayer (dt : float32<s>) player =
+    let distPerRunningFrame = 0.5f<m>
+    let numFrames = 4
+    let player = updateKeyFrame dt player
+    let pos = player.pos + dt * player.speed * player.direction
+    let travelled = player.travelled + (pos - player.pos).Length
+    let travelled, frame =
+        if travelled > distPerRunningFrame then
+            travelled - distPerRunningFrame, (player.runningFrame + 1) % numFrames
+        else
+            travelled, player.runningFrame
+    let speed =
+        match player.activity with
+        | Trapping
+        | Fallen _ -> 0.0f<m/s>
+
+        | Standing
+        | Jumping _
+        | Kicking _ -> player.speed
+
+        | Tackling(kf, _) ->
+            if kf > 0.7f<kf> then
+                1.1f * getRunSpeed player
+            elif kf > 0.3f<kf> then
+                getRunSpeed player
+            else
+                (kf / 0.3f<kf>) * getRunSpeed player
+
+        | KeeperDive kf ->
+            if kf > 0.7f<kf> then
+                2.0f * getRunSpeed player
+            elif kf > 0.3f<kf> then
+                1.5f * getRunSpeed player
+            else
+                1.5f * (kf / 0.3f<kf>) * getRunSpeed player
+
+    { player with pos = pos ; speed = speed ; travelled = travelled ; runningFrame = frame }

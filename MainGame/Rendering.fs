@@ -17,7 +17,6 @@ type Resources =
         ballShadow : Texture2D
         playerSprites : Texture2D
         playerShadows : Texture2D
-        goalShadows : Texture2D
         whiteLine : Texture2D
     }
 
@@ -159,7 +158,24 @@ let renderLines
     drawVLine (x1, y0) y1
     drawHLine (x0, y1) x1
 
-
+let sin45m = sin (0.5f * MathHelper.PiOver4)
+let sin45M = sin (1.5f * MathHelper.PiOver4)
+let sin45 = sin (MathHelper.PiOver4)
+let discretizeTrigo x =
+    let x' = abs x
+    let sx =
+        if x' > sin45M then
+            1.0f
+        elif x' > sin45m then
+            sin45
+        else
+            0.0f
+    if x < 0.0f then
+        -sx
+    else
+        sx
+    
+                
 let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper goalLower (pitch : Team.PitchTraits) (viewX, viewY) sprites =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
@@ -180,31 +196,41 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let playerRadius = 0.5f<m>
             let x, y = worldToScreen (x - playerRadius, y + playerRadius)
             let w = 2.0f * playerRadius * ratio |> int
+            let sw = 64
             let sx, sy =
                 match player.activity with
+                | Player.Standing _ ->
+                    sw * player.runningFrame, 0
                 | _ -> 0, 0
-            let sw = 64
-            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White)
+            let dx = player.direction.X |> discretizeTrigo
+            let dy = player.direction.Y |> discretizeTrigo
+            let angle = atan2 dx dy
+            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White, angle, Vector2(32.0f, 32.0f), SpriteEffects.None, 0.0f)
+
         | { spriteType = GoalUpper } ->
             let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
             sb.Draw(goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
+
         | { spriteType = GoalLower } ->
             let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
 
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, x, y) =
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, playerState, x, y) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
-    let pitch : Team.PitchTraits = { width = 68.0f<m> ; length = 105.0f<m> }
     sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
         renderLines sb viewSize line pitch (x, y)
-        renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) [| { spriteType = GoalUpper ; x = 0.0f<m> ; y = 0.0f<m> } ; { spriteType = GoalLower ; x = 0.0f<m> ; y = 0.0f<m> } |]
+        let sprites =
+            [| { spriteType = GoalUpper ; x = 0.0f<m> ; y = 0.0f<m> }
+               { spriteType = GoalLower ; x = 0.0f<m> ; y = 0.0f<m> }
+               { spriteType = Player(playerState, Team.TeamA) ; x = playerState.pos.X ; y = playerState.pos.Y } |]
+        renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) sprites
     finally
         sb.End()
 
@@ -233,7 +259,7 @@ let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBa
         renderLines sb viewSize resources.whiteLine state.pitch viewPos
         renderPlayerShadows sb viewSize resources.playerShadows viewPos (Array.concat [state.teamA.onPitch ; state.teamB.onPitch])
         renderBallShadow sb viewSize resources.ballShadow viewPos state.ball.pos
-        renderGoalShadows sb viewSize resources.goalShadows viewPos
+        //renderGoalShadows sb viewSize resources.goalShadows viewPos
         renderSprites sb viewSize resources.ball resources.playerSprites resources.goalUpper resources.goalLower state.pitch viewPos sprites
     finally
         sb.End()
