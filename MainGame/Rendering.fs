@@ -32,16 +32,46 @@ let worldToScreen
     let y' = (-(y - viewY) / viewHeight + 0.5f) * screenHeight
     (x', y')
 
+let inline cmp (o1 : #System.IComparable<'T>) (o2 : #System.IComparable<'T>) =
+    o1.CompareTo(o2)
+
 type SpriteType =
-    | Ball of float32<m>
+    | Ball of Ball.State
     | Player of Player.State * Team.TeamSide
     | GoalUpper
     | GoalLower
-
-type PositionedSprite =
-    { spriteType : SpriteType
-      x : float32<m>
-      y : float32<m> }
+with
+    static member Compare(this, other) =
+        match this, other with
+        | Ball b1, Ball b2 -> cmp b1.pos.Y b2.pos.Y
+        | Ball ball, Player(player, _) ->
+            if player.traits.length < ball.pos.Z then
+                -1
+            else
+                cmp player.pos.Y ball.pos.Y
+        | Ball ball, GoalUpper
+        | Ball ball, GoalLower ->
+            if ball.pos.Z < Physics.goalHeight then
+                -1
+            elif ball.pos.Z = Physics.goalHeight then
+                0
+            else
+                +1
+        | Player(player1, _), Player(player2, _) ->
+            cmp player2.pos.Y player1.pos.Y
+        | Player _, GoalUpper -> -1
+        | Player _, GoalLower -> +1
+        | Player _, Ball _ ->
+            SpriteType.Compare(other, this)
+        | GoalUpper, Ball _
+        | GoalLower, Ball _  ->
+            SpriteType.Compare(other, this)
+        | GoalUpper, Player _ -> +1
+        | GoalLower, Player _ -> -1
+        | GoalUpper, GoalUpper -> 0
+        | GoalUpper, GoalLower -> -1
+        | GoalLower, GoalLower -> 0
+        | GoalLower, GoalUpper -> +1
 
 let renderGrass (sb : SpriteBatch) (viewWidth : float32<m>, viewHeight : float32<m>) (lightGrass : Texture2D) (darkGrass : Texture2D) (viewX : float32<m>, viewY : float32<m>) =
     let darkStripHeight = 1.0f<px> * float32 darkGrass.Height / ratio
@@ -181,16 +211,16 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
     
     for s in sprites do
         match s with
-        | { spriteType = Ball h ; x = x ; y = y } ->
-            let scale = 1.0f + h / 30.0f<m>
+        | Ball b ->
+            let scale = 1.0f + b.pos.Z / 30.0f<m>
             let scaledRadius = scale * Ball.ballRadius
-            let x = x - scaledRadius
-            let y = y + scaledRadius
+            let x = b.pos.X - scaledRadius
+            let y = b.pos.Y + scaledRadius
             let x, y = worldToScreen (x, y)
             let w = 2.0f * scaledRadius * ratio |> int
             sb.Draw(ball, Rectangle(int x, int y, w, w), Color.White)
 
-        | { spriteType = Player(player, side) } ->
+        | Player(player, side) ->
             let x = player.pos.X
             let y = player.pos.Y
             let playerRadius = 0.5f<m>
@@ -207,11 +237,11 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let angle = atan2 dx dy
             sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White, angle, Vector2(32.0f, 32.0f), SpriteEffects.None, 0.0f)
 
-        | { spriteType = GoalUpper } ->
+        | GoalUpper ->
             let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
             sb.Draw(goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
 
-        | { spriteType = GoalLower } ->
+        | GoalLower ->
             let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
@@ -227,9 +257,10 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
         renderGrass sb viewSize darkGrass lightGrass (x, y)
         renderLines sb viewSize line pitch (x, y)
         let sprites =
-            [| { spriteType = GoalUpper ; x = 0.0f<m> ; y = 0.0f<m> }
-               { spriteType = GoalLower ; x = 0.0f<m> ; y = 0.0f<m> }
-               { spriteType = Player(playerState, Team.TeamA) ; x = playerState.pos.X ; y = playerState.pos.Y } |]
+            [| GoalUpper
+               GoalLower
+               Player(playerState, Team.TeamA) |]
+        Array.sortInPlaceWith (fun this other -> SpriteType.Compare(this, other)) sprites
         renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) sprites
     finally
         sb.End()
@@ -242,16 +273,17 @@ let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBa
         (viewX, viewY)
 
     let sprites =
-        seq {
+        [|
             for player in state.teamA.onPitch do
-                yield { x = player.pos.X ; y = player.pos.Y ; spriteType = Player(player, Team.TeamA) }
+                yield Player(player, Team.TeamA)
             for player in state.teamB.onPitch do
-                yield { x = player.pos.X ; y = player.pos.Y ; spriteType = Player(player, Team.TeamB) }
-            yield { x = 0.0f<m> ; y = state.pitch.length * 0.5f ; spriteType = GoalUpper }
-            yield { x = 0.0f<m> ; y = -state.pitch.length * 0.5f ; spriteType = GoalLower }
-            yield { x = state.ball.pos.X ; y = state.ball.pos.Y ; spriteType = Ball(state.ball.pos.Z) }
-        }
-        |> Seq.sortBy (function { x = x ; y = y } -> (-y, x))
+                yield Player(player, Team.TeamB)
+            yield GoalUpper
+            yield GoalLower
+            yield Ball(state.ball)
+        |]
+
+    Array.sortInPlaceWith (fun this other -> SpriteType.Compare(this, other)) sprites
 
     try
         sb.Begin()
