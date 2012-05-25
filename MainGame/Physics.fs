@@ -21,29 +21,29 @@ let vector3Of2 (v2 : TypedVector2<'M>) : TypedVector3<'M>=
 
 type BallImpulse<'PlayerId> =
     | Free
-    | BouncedOffPlayer of 'PlayerId * TypedVector3<m/s> // Bounced off a player, who will have a chance to initiate a kick within some small amount of time
-    | Bounced of TypedVector3<m/s> // Bounced off something or some player who will not be able to initiate a kick.
-    | Header of TypedVector3<m/s>  // Bounced off a player that is currently jumping
-    | Pushed of 'PlayerId * TypedVector3<m/s>  // Bounced off a player that has control over the ball
+    | Bounced of TypedVector3<m/s> // Bounced off an obstacle (goal post...)
+    | BouncedOffPlayer of 'PlayerId * TypedVector3<m/s> // Bounced off a player
+    | Pushed of 'PlayerId * TypedVector3<m/s> // Bounced off a player that has control over the ball
     | Trapped of 'PlayerId  // Trapped by a player.
+    | Kicked of 'PlayerId * TypedVector3<m/s> // Kicked by a player
 
 let (|SomeImpulse|_|) =
     function
     | Bounced imp
     | BouncedOffPlayer(_, imp)
-    | Pushed(_, imp)
-    | Header imp -> Some imp
+    | Pushed(_, imp) -> Some imp
+    | Kicked(_, imp) -> Some imp
     | Trapped _ -> Some TypedVector3<m/s>.Zero
     | Free -> None
 
-let controlMaxDistance = 0.5f<m> // Beyond this distance, balls don't collide with players.
+let controlMaxDistance = 1.0f<m> // Beyond this distance, balls don't collide with players.
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
 let keeperBounceRestitution = 0.5f // Bounciness of the keeper-ball collisions when the keeper fails to catch the ball
 let playerBounceRestitution = 0.8f // Bounciness of player-ball collisions
 let playerTackleRestitution = 0.5f // Bounciness of collisions between tackling players and the ball
-let maxBallControlSpeed = 2.0f<m/s> // Maximum speed relative to the player under which control is achieved
+let maxBallControlSpeed = 10.0f<m/s> // Maximum speed relative to the player under which control is achieved
 let pushSpeedFactor = 1.0f // Affects how far players push the ball when they have control over it
 
 let collideBallWithPlayer (playerId, player : Player.State) ball =
@@ -60,18 +60,22 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
             | Player.Jumping _ -> Player.jumpHeight
             | _ -> 0.0f<m>
 
-        if ball.pos.Y - Ball.ballRadius <= player.traits.length + jump then
+        if ball.pos.Z - Ball.ballRadius <= player.traits.length + jump then
             let dist = relPos.Length
             if dist < controlMaxDistance then
                 match player.activity with
                 | Player.Trapping ->
                     Trapped(playerId)
+
                 | Player.Fallen _ ->
                     Free
+
                 | Player.Jumping _ ->
-                    Header(headerSpeed * vector3Of2 player.direction)
+                    BouncedOffPlayer(playerId, headerSpeed * vector3Of2 player.direction)
+
                 | Player.Kicking _ ->
-                    Bounced(collideLightWithHeavy playerBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+                    Kicked(playerId, collideLightWithHeavy playerBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+                
                 | Player.Tackling _ ->
                     BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
 
@@ -79,12 +83,12 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
                     if abs(keyframe - optimalKeeperKeyframe) < keeperCaughtThreshold then
                         Trapped(playerId)
                     else
-                        Bounced(collideLightWithHeavy keeperBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+                        BouncedOffPlayer(playerId, collideLightWithHeavy keeperBounceRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
 
                 | Player.Standing _ ->
                     let canControl =
                         player.speed > 0.0f<m/s> &&
-                        TypedVector.dot2(player.direction, relPos) < 0.0f<m> &&
+                        TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
                         relSpeed.Length < maxBallControlSpeed * player.traits.ballControl
 
                     if canControl then                        
@@ -154,28 +158,30 @@ let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
     collideWithBar
 
 
-let gravity = TypedVector3<m/s^2>(0.0f<_>, -9.8f<_>, 0.0f<_>)
+let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
 let pitchRestitution = 0.5f
 let pitchDrag = 0.5f</s>
 
-type InfluenceFunc<'PlayerId> = InfluenceFunc of ('PlayerId -> TypedVector3<m/s> * InfluenceFunc<'PlayerId>)
-
-let updateBall goalCenters (dt : float32<s>) (InfluenceFunc getInfluence as influence) players ball =
+let updateBall goalCenters (dt : float32<s>) players ball =
     let impulse = collidePlayersWithBall ball players
-    let speed, influence =
+    
+    match impulse with
+    | Free -> ()
+    | _ -> printfn "%A" impulse
+
+    let speed =
         match impulse with
         | Free ->
-            ball.speed + dt * gravity, influence
+            ball.speed + dt * gravity
         | Bounced imp ->
-            ball.speed + imp + dt * gravity, influence
+            ball.speed + imp + dt * gravity
         | BouncedOffPlayer(player, imp) ->
-            let imp', (influence : InfluenceFunc<_>) = getInfluence player
-            ball.speed + imp + imp' + dt * gravity, influence
+            ball.speed + imp + dt * gravity
         | Pushed(_, imp)
-        | Header(imp) ->
-            imp, influence
+        | Kicked(_, imp) ->
+            imp
         | Trapped _ ->
-            TypedVector3.Zero, influence
+            TypedVector3.Zero
 
     let pos = ball.pos + dt * speed
 
@@ -183,7 +189,12 @@ let updateBall goalCenters (dt : float32<s>) (InfluenceFunc getInfluence as infl
     let posZ, speedZ, drag =
         match pos.Z - Ball.ballRadius with
         | h when h < 0.0f<m> ->
-            -h * pitchRestitution + Ball.ballRadius, -pitchRestitution * speed.Z, pitchDrag
+            -h * pitchRestitution + Ball.ballRadius,
+            (if speed.Z < 0.0f<m/s> then
+                -pitchRestitution * speed.Z
+             else
+                speed.Z),
+            pitchDrag
         | _ ->
             pos.Z, speed.Z, 0.0f</s>
 
@@ -199,4 +210,4 @@ let updateBall goalCenters (dt : float32<s>) (InfluenceFunc getInfluence as infl
         goalCenters
         |> Seq.sumBy (collideGoalWithBall ball)
 
-    ball = { ball with speed = ball.speed + goalImpulses }
+    { ball with speed = ball.speed + goalImpulses }, impulse

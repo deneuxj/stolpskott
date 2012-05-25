@@ -26,9 +26,13 @@ type TrainingGameplay(game, content : Content.ContentManager) =
         { width = 68.0f<m>
           length = 105.0f<m>
         }
+    let goalCenters =
+        [| TypedVector2<m>(0.0f<m>, pitch.length / 2.0f)
+           TypedVector2<m>(0.0f<m>, -pitch.length / 2.0f)
+        |]
     let state = ref {
             player =
-                { pos = TypedVector2<m>()
+                { pos = TypedVector2<m>(0.0f<m>, -3.0f<m>)
                   direction = TypedVector2<1>(0.0f, 1.0f)
                   speed = 0.0f<m/s>
                   travelled = 0.0f<m>
@@ -39,14 +43,14 @@ type TrainingGameplay(game, content : Content.ContentManager) =
                       stamina = 1.0f<sta>
                       strength = 1.0f<st>
                       length = 1.8f<m>
-                      ballControl = 1.0f<bc>
+                      ballControl = 0.5f<bc>
                     }
                   isKeeper = false
                   health = 1.0f<he>
                   condition = 1.0f<sta> }
             ball =
-                { pos = TypedVector3<m>()
-                  speed = TypedVector3<m/s>()
+                { pos = TypedVector3<m>(0.0f<m>, 0.0f<m>, 1.0f<m>)
+                  speed = TypedVector3<m/s>(0.0f<m/s>, 0.0f<m/s>, 0.0f<m/s>)
                   inPlay = Ball.InPlay
                 }
         }
@@ -76,11 +80,13 @@ type TrainingGameplay(game, content : Content.ContentManager) =
         let playerState = Player.updateKeyFrame dt playerState
         let playerState = Player.updatePlayer dt playerState
         
+        let ballState, impulse = Physics.updateBall goalCenters dt [| ((Team.TeamA, 0), playerState) |] state.Value.ball
+
         controller := control
-        state := { state.Value with player = playerState }
+        state := { state.Value with player = playerState ; ball = ballState }
 
     override this.Draw(_) =
         match spriteBatch.Value, textures.Value with
         | Some spriteBatch, Some textures ->
-            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, state.Value.player, state.Value.player.pos.X, state.Value.player.pos.Y)
+            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, state.Value.player, state.Value.ball)
         | _ -> ()

@@ -246,12 +246,14 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
 
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, playerState, x, y) =
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, playerState : Player.State, ballState) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
+    let x, y = playerState.pos.X, playerState.pos.Y
+
     sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
@@ -259,7 +261,8 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
         let sprites =
             [| GoalUpper
                GoalLower
-               Player(playerState, Team.TeamA) |]
+               Player(playerState, Team.TeamA)
+               Ball(ballState) |]
         Array.sortInPlaceWith (fun this other -> SpriteType.Compare(this, other)) sprites
         renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) sprites
     finally
