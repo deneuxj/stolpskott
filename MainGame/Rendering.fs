@@ -223,10 +223,10 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
         | Player(player, side) ->
             let x = player.pos.X
             let y = player.pos.Y
-            let playerRadius = 0.5f<m>
-            let x, y = worldToScreen (x - playerRadius, y + playerRadius)
+            let playerRadius = 0.3f<m>
+            let x, y = worldToScreen (x, y)
             let w = 2.0f * playerRadius * ratio |> int
-            let sw = 64
+            let sw = 32
             let sx, sy =
                 match player.activity with
                 | Player.Standing _ ->
@@ -235,7 +235,7 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let dx = player.direction.X |> discretizeTrigo
             let dy = player.direction.Y |> discretizeTrigo
             let angle = atan2 dx dy
-            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White, angle, Vector2(32.0f, 32.0f), SpriteEffects.None, 0.0f)
+            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White, angle, Vector2(16.0f, 16.0f), SpriteEffects.None, 0.0f)
 
         | GoalUpper ->
             let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
