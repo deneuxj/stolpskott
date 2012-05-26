@@ -142,34 +142,35 @@ let collidePlayersWithBall ball players =
 let goalWidth = 7.32f<m>
 let goalHeight = 2.44f<m>
 let goalPostRadius = 0.07f<m>
+let goalPostRestitution = 1.0f
 
 let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
-    let relPos = TypedVector2<m>(ball.pos.X, ball.pos.Y) - goalCenter
+    let relPos = ball.pos - TypedVector3<m>(goalCenter.X, goalCenter.Y, 0.0f<_>)
 
     let collideWithPost x =
-        let postRelPos = relPos - TypedVector2<m>(x, 0.0f<m>)
+        let postRelPos = relPos - TypedVector3<m>(x, 0.0f<_>, 0.0f<_>)
         let dist = postRelPos.Length
-        let normal = 1.0f / dist * vector3Of2 postRelPos
+        let normal = (1.0f / dist) * postRelPos
         let collides =
             dist < Ball.ballRadius + goalPostRadius &&
             ball.pos.Z < goalHeight
 
         if collides then
-            collideLightWithHeavy 1.0f normal ball.speed
+            collideLightWithHeavy goalPostRestitution normal ball.speed
         else
             TypedVector3.Zero
 
     let collideWithBar =
-        let postRelPos = TypedVector2<m>(ball.pos.Y, ball.pos.Z) - TypedVector2<m>(0.0f<m>, goalHeight)
+        let postRelPos = TypedVector3<m>(0.0f<m>, ball.pos.Y, ball.pos.Z) - TypedVector3<m>(0.0f<m>, goalCenter.Y, goalHeight)
         let dist = postRelPos.Length
-        let normal = 1.0f / dist * TypedVector3<m>(0.0f<m>, postRelPos.X, postRelPos.Y)
+        let normal = (1.0f / dist) * postRelPos
 
         let collides =
             dist < Ball.ballRadius + goalPostRadius &&
             abs(relPos.X) < goalWidth / 2.0f
 
         if collides then
-            collideLightWithHeavy 1.0f normal ball.speed
+            collideLightWithHeavy goalPostRestitution normal ball.speed
         else
             TypedVector3.Zero
 
@@ -209,11 +210,8 @@ let updateBall goalCenters (dt : float32<s>) players ball =
     let posZ, speedZ, drag =
         match pos.Z - Ball.ballRadius with
         | h when h < 0.0f<m> ->
-            -h * pitchRestitution + Ball.ballRadius,
-            (if speed.Z < 0.0f<m/s> then
-                -pitchRestitution * speed.Z
-             else
-                speed.Z),
+            Ball.ballRadius,
+            -pitchRestitution * speed.Z,
             pitchDrag
         | _ ->
             pos.Z, speed.Z, 0.0f</s>

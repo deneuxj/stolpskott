@@ -4,6 +4,7 @@ open Microsoft.Xna.Framework.Graphics
 open Microsoft.Xna.Framework
 open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils
+open CleverRake.StolpSkott.Units
 
 [<Measure>] type px // Pixels
 
@@ -205,7 +206,19 @@ let discretizeTrigo x =
     else
         sx
     
-                
+let runningFrames = [| 0 .. 3 |]
+let tacklingFrames = Array.concat [[| 3 .. 8 |] ; [| 8;8;8;8;8 |]]
+let jumpingFrames = Array.concat [[|3|] ; [| 9 .. 14 |]]
+
+let getFrame frames (kf : float32<kf>) =
+    let num = Array.length frames
+    let idx =
+        kf * (1.0f + float32 num)
+        |> int
+        |> min (num - 1)
+        |> max 0
+    frames.[idx]
+
 let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper goalLower (pitch : Team.PitchTraits) (viewX, viewY) sprites =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
@@ -230,10 +243,13 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let sx, sy =
                 match player.activity with
                 | Player.Standing _ ->
-                    sw * player.runningFrame, 0
+                    sw * runningFrames.[player.runningFrame], 0
                 | Player.Tackling(kf, _) ->
-                    let frame = kf * 12.0f |> int
-                    sw * (min 4 frame + 4), 0
+                    let frame = getFrame tacklingFrames kf
+                    sw * frame, 0
+                | Player.Jumping kf ->
+                    let frame = getFrame jumpingFrames kf
+                    sw * frame, 0
                 | _ -> 0, 0
             let dx = player.direction.X |> discretizeTrigo
             let dy = player.direction.Y |> discretizeTrigo

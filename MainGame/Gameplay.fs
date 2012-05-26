@@ -91,6 +91,12 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             | _ -> ballState
             |> Team.boundBall pitch
 
+        let ballState =
+            if Input.Keyboard.GetState().IsKeyDown(Input.Keys.Space) then
+                { ballState with pos = ballState.pos + TypedVector3<m>(0.0f<_>, 0.0f<_>, 10.0f<_>) }
+            else
+                ballState
+
         prePad <- pad
         controller := control
         state := { state.Value with player = playerState ; ball = ballState }
