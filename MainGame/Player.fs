@@ -41,7 +41,7 @@ let getRunSpeed { traits = { speed = speed }; health = health; condition = condi
 
 let updateKeyFrame (dt : float32<s>) player =
     let jumpingLength = 0.5f<s>
-    let tacklingLength = 0.75f<s>
+    let tacklingLength = 2.0f<s>
     let kickingLength = 0.2f<s>
     let fallenLength = 1.0f<s>
     let keeperDiveLength = 0.75f<s>
@@ -104,12 +104,12 @@ let updatePlayer (dt : float32<s>) player =
         | Kicking _ -> player.speed
 
         | Tackling(kf, _) ->
-            if kf > 0.7f<kf> then
+            if kf < 0.3f<kf> then
                 1.1f * getRunSpeed player
-            elif kf > 0.3f<kf> then
+            elif kf < 0.7f<kf> then
                 getRunSpeed player
             else
-                (kf / 0.3f<kf>) * getRunSpeed player
+                1.0f<m/s> * MathHelper.Lerp(float32 <| getRunSpeed player, 0.0f, (kf - 0.7f<kf>) / 0.3f<kf>)
 
         | KeeperDive kf ->
             if kf > 0.7f<kf> then

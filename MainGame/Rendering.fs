@@ -231,6 +231,9 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
                 match player.activity with
                 | Player.Standing _ ->
                     sw * player.runningFrame, 0
+                | Player.Tackling(kf, _) ->
+                    let frame = kf * 12.0f |> int
+                    sw * (min 4 frame + 4), 0
                 | _ -> 0, 0
             let dx = player.direction.X |> discretizeTrigo
             let dy = player.direction.Y |> discretizeTrigo
