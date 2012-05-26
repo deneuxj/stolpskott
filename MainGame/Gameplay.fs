@@ -11,7 +11,7 @@ type State =
       ball : Ball.State
     }
 
-type TrainingGameplay(game, content : Content.ContentManager) =
+type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
     inherit DrawableGameComponent(game)
 
     let textures : Rendering.Resources option ref = ref None
@@ -55,6 +55,7 @@ type TrainingGameplay(game, content : Content.ContentManager) =
                 }
         }
     let controller = ref Controls.Running
+    let mutable prePad = Input.GamePad.GetState(playerIndex)
 
     override this.LoadContent() =
         textures :=
@@ -76,8 +77,9 @@ type TrainingGameplay(game, content : Content.ContentManager) =
         let dt = 1.0f<s> * float32 gt.ElapsedGameTime.TotalSeconds
         let hasBallControl =
             (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
+        let pad = Input.GamePad.GetState(playerIndex)
         let control, playerState =
-            Controls.updateControl config (Input.GamePad.GetState(PlayerIndex.One)) hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) (controller.Value, state.Value.player)
+            Controls.updateControl config prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) (controller.Value, state.Value.player)
         let playerState = Player.updateKeyFrame dt playerState
         let playerState = Player.updatePlayer dt playerState
         
@@ -89,6 +91,7 @@ type TrainingGameplay(game, content : Content.ContentManager) =
             | _ -> ballState
             |> Team.boundBall pitch
 
+        prePad <- pad
         controller := control
         state := { state.Value with player = playerState ; ball = ballState }
 

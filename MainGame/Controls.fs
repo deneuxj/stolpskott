@@ -25,7 +25,7 @@ type Configuration =
       kick : GamePadState -> bool
     }
 
-let updateControl config (pad : GamePadState) hasBallControl isBallHigh (activity, player : Player.State) =
+let updateControl config prePad pad hasBallControl isBallHigh (activity, player : Player.State) =
     let dir, speed =
         let x, y = config.direction pad
         let v = TypedVector2<1>(x, y)
@@ -40,7 +40,7 @@ let updateControl config (pad : GamePadState) hasBallControl isBallHigh (activit
     | Running, Standing ->
         if config.trap pad then
             TrappingBall, { player with activity = Trapping ; direction = dir ; speed = 0.0f<m/s> }
-        elif config.kick pad then
+        elif config.kick pad && not <| config.kick prePad then
             match hasBallControl, isBallHigh with
             | _, true -> Jumping, { player with activity = Player.Jumping 0.0f<kf> }
             | true, false -> Kicking, { player with activity = Player.Kicking 0.0f<kf> }
