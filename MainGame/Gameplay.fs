@@ -75,7 +75,7 @@ type TrainingGameplay(game, content : Content.ContentManager) =
     override this.Update(gt) =
         let dt = 1.0f<s> * float32 gt.ElapsedGameTime.TotalSeconds
         let hasBallControl =
-            (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f * Physics.controlMaxDistance
+            (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
         let control, playerState =
             Controls.updateControl config (Input.GamePad.GetState(PlayerIndex.One)) hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) (controller.Value, state.Value.player)
         let playerState = Player.updateKeyFrame dt playerState

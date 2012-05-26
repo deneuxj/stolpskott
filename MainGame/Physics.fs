@@ -36,15 +36,15 @@ let (|SomeImpulse|_|) =
     | Trapped _ -> Some TypedVector3<m/s>.Zero
     | Free -> None
 
-let controlMaxDistance = 1.0f<m> // Beyond this distance, balls don't collide with players.
-let kickMaxDistance = 1.5f<m>
+let controlMaxDistance = 0.5f<m> // Beyond this distance, balls don't collide with players.
+let kickMaxDistance = 0.8f<m>
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
 let keeperBounceRestitution = 0.5f // Bounciness of the keeper-ball collisions when the keeper fails to catch the ball
 let playerBounceRestitution = 0.8f // Bounciness of player-ball collisions
 let playerTackleRestitution = 0.5f // Bounciness of collisions between tackling players and the ball
-let maxBallControlSpeed = 10.0f<m/s> // Maximum speed relative to the player under which control is achieved
+let maxBallControlSpeed = 20.0f<m/s> // Maximum speed relative to the player under which control is achieved
 let pushSpeedFactor = 1.0f // Affects how far players push the ball when they have control over it
 
 let collideBallWithPlayer (playerId, player : Player.State) ball =
