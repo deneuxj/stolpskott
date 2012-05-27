@@ -46,7 +46,10 @@ let updateControl config prePad pad hasBallControl isBallHigh (player : Player.S
         if config.trap pad then
             { player with direction = dir }
         else
-            { player with activity = Standing }
+            { player with activity = Passing }
+
+    | Player.Passing ->
+        { player with activity = Standing }
 
     | Player.Kicking _ ->
         player

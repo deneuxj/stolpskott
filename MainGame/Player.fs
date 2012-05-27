@@ -10,6 +10,7 @@ type Activity =
     | Jumping of float32<kf>
     | Tackling of float32<kf> * bool // animation key, has touched the ball
     | Trapping
+    | Passing
     | Kicking of float32<kf>
     | Fallen of float32<kf>
     | KeeperDive of float32<kf>
@@ -40,7 +41,7 @@ let getRunSpeed { traits = { speed = speed }; health = health; condition = condi
     speed * health * condition / 1.0f<he sta>
 
 let updateKeyFrame (dt : float32<s>) player =
-    let jumpingLength = 0.5f<s>
+    let jumpingLength = 2.0f<s>
     let tacklingLength = 2.0f<s>
     let kickingLength = 0.2f<s>
     let fallenLength = 1.0f<s>
@@ -50,6 +51,7 @@ let updateKeyFrame (dt : float32<s>) player =
         match player.activity with
         | Standing -> Standing
         | Trapping -> Trapping
+        | Passing -> Passing
         | Jumping kf ->
             let kf = kf + 1.0f<kf> * dt / jumpingLength
             if kf < 1.0f<kf> then 
@@ -97,6 +99,7 @@ let updatePlayer (dt : float32<s>) player =
     let speed =
         match player.activity with
         | Trapping
+        | Passing
         | Fallen _ -> 0.0f<m/s>
 
         | Standing

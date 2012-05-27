@@ -37,7 +37,7 @@ let (|SomeImpulse|_|) =
     | Free -> None
 
 let controlMaxDistance = 0.5f<m> // Beyond this distance, balls don't collide with players.
-let kickMaxDistance = 0.8f<m>
+let kickMaxDistance = 0.8f<m> // Distance from the ball within which a player can kick it.
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
@@ -46,6 +46,18 @@ let playerBounceRestitution = 0.8f // Bounciness of player-ball collisions
 let playerTackleRestitution = 0.5f // Bounciness of collisions between tackling players and the ball
 let maxBallControlSpeed = 20.0f<m/s> // Maximum speed relative to the player under which control is achieved
 let pushSpeedFactor = 1.0f // Affects how far players push the ball when they have control over it
+let hardKickElevation = 10.0f<m/s> // How fast the ball goes up upon leaving the foot of the kicker
+let hardKickSpeed = 50.0f<m/s> // How fast the ball goes forward upon leaving the foot of the kicker
+let softKickElevation = 5.0f<m/s>
+let softKickSpeed = 20.0f<m/s>
+
+let makeKick (kickElevation : float32<m/s>) (kickSpeed : float32<m/s>) (ballControl : float32<bc>) (direction : TypedVector2<1>) =
+    let kickHeight =
+        kickElevation * MathHelper.Lerp(1.0f, 0.5f, ballControl)
+    let kick =
+        kickSpeed * TypedVector3<1>(direction.X, direction.Y, 0.0f)
+        + TypedVector3<m/s>(0.0f<_>, 0.0f<_>, kickHeight)
+    kick
 
 let collideBallWithPlayer (playerId, player : Player.State) ball =
     let ballSpeed2d = TypedVector2<m/s>(ball.speed.X, ball.speed.Y)
@@ -72,6 +84,13 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
             else
                 Free
 
+        | Player.Passing ->
+            if dist < controlMaxDistance then
+                let kick = makeKick softKickElevation softKickSpeed player.traits.ballControl player.direction
+                Kicked(playerId, kick)
+            else
+                Free
+
         | Player.Fallen _ ->
             Free
 
@@ -83,13 +102,7 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
 
         | Player.Kicking kf ->
             if isBallGoingTowardsPlayer && dist < kickMaxDistance then
-                let kickHeight =
-                    10.0f<m/s> * MathHelper.Lerp(1.0f, 0.5f, player.traits.ballControl)
-                let kickSpeed =
-                    50.0f<m/s>
-                let kick =
-                    kickSpeed * TypedVector3<1>(player.direction.X, player.direction.Y, 0.0f)
-                    + TypedVector3<m/s>(0.0f<_>, 0.0f<_>, kickHeight)
+                let kick = makeKick hardKickElevation hardKickSpeed player.traits.ballControl player.direction
                 Kicked(playerId, kick)
             else
                 Free
