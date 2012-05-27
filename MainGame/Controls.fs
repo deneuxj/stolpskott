@@ -9,14 +9,13 @@ open CleverRake.StolpSkott.Units
 open CleverRake.XnaUtils
 open CleverRake.XnaUtils.Units
 
-
 type Configuration =
     { direction : GamePadState -> float32 * float32
       trap : GamePadState -> bool
       kick : GamePadState -> bool
     }
 
-let updateControl config prePad pad hasBallControl isBallHigh (player : Player.State) =
+let updateControl config dt prePad pad hasBallControl isBallHigh (player : Player.State) =
     let dir, speed =
         let x, y = config.direction pad
         let v = TypedVector2<1>(x, y)
@@ -31,7 +30,7 @@ let updateControl config prePad pad hasBallControl isBallHigh (player : Player.S
         elif config.kick pad && not <| config.kick prePad then
             match hasBallControl, isBallHigh with
             | _, true -> { player with activity = Player.Jumping 0.0f<kf> }
-            | true, false -> { player with activity = Player.Kicking 0.0f<kf> }
+            | true, false -> { player with activity = Player.Kicking(0.0f<kf>) }
             | false, false -> { player with activity = Player.Tackling(0.0f<kf>, false) }
         else
             { player with activity = Standing ; direction = dir ; speed = speed }
@@ -51,7 +50,7 @@ let updateControl config prePad pad hasBallControl isBallHigh (player : Player.S
     | Player.Passing ->
         { player with activity = Standing }
 
-    | Player.Kicking _ ->
+    | Player.Kicking(kf) ->
         player
 
     | Player.Fallen _ ->

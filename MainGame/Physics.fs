@@ -38,6 +38,7 @@ let (|SomeImpulse|_|) =
 
 let controlMaxDistance = 0.5f<m> // Beyond this distance, balls don't collide with players.
 let kickMaxDistance = 0.8f<m> // Distance from the ball within which a player can kick it.
+let pushedDistance = 0.3f<m>
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
@@ -45,19 +46,18 @@ let keeperBounceRestitution = 0.5f // Bounciness of the keeper-ball collisions w
 let playerBounceRestitution = 0.8f // Bounciness of player-ball collisions
 let playerTackleRestitution = 0.5f // Bounciness of collisions between tackling players and the ball
 let maxBallControlSpeed = 20.0f<m/s> // Maximum speed relative to the player under which control is achieved
-let pushSpeedFactor = 1.0f // Affects how far players push the ball when they have control over it
-let hardKickElevation = 10.0f<m/s> // How fast the ball goes up upon leaving the foot of the kicker
-let hardKickSpeed = 50.0f<m/s> // How fast the ball goes forward upon leaving the foot of the kicker
-let softKickElevation = 5.0f<m/s>
+let minPushSpeedFactor = 1.25f // Affects how far good players push the ball when they have control over it
+let maxPushSpeedFactor = 1.5f // Affects how far poor players push the ball when they have control over it
+let hardKickElevation = 0.2f // Controls how fast the ball goes up upon leaving the foot of the kicker
+let hardKickSpeed = 40.0f<m/s> // How fast the ball goes forward upon leaving the foot of the kicker
+let softKickElevation = 0.1f
 let softKickSpeed = 20.0f<m/s>
 
-let makeKick (kickElevation : float32<m/s>) (kickSpeed : float32<m/s>) (ballControl : float32<bc>) (direction : TypedVector2<1>) =
+let makeKick (kickElevation : float32<1>) (kickSpeed : float32<m/s>) (ballControl : float32<bc>) (direction : TypedVector2<1>) =
     let kickHeight =
-        kickElevation * MathHelper.Lerp(1.0f, 0.5f, ballControl)
-    let kick =
-        kickSpeed * TypedVector3<1>(direction.X, direction.Y, 0.0f)
-        + TypedVector3<m/s>(0.0f<_>, 0.0f<_>, kickHeight)
-    kick
+        kickElevation * MathHelper.Lerp(2.0f, 1.0f, ballControl)
+    let dir = TypedVector3<1>(direction.X, direction.Y, kickHeight) |> TypedVector.normalize3
+    kickSpeed * dir
 
 let collideBallWithPlayer (playerId, player : Player.State) ball =
     let ballSpeed2d = TypedVector2<m/s>(ball.speed.X, ball.speed.Y)
@@ -100,9 +100,10 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
             else
                 Free
 
-        | Player.Kicking kf ->
+        | Player.Kicking (kf) ->
             if isBallGoingTowardsPlayer && dist < kickMaxDistance then
-                let kick = makeKick hardKickElevation hardKickSpeed player.traits.ballControl player.direction
+                let controlModifier = MathHelper.Lerp(1.0f, 0.5f, (dist - pushedDistance) / (kickMaxDistance - pushedDistance))
+                let kick = makeKick hardKickElevation hardKickSpeed (controlModifier * player.traits.ballControl) player.direction
                 Kicked(playerId, kick)
             else
                 Free
@@ -127,8 +128,9 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
                 TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
                 relSpeed.Length < maxBallControlSpeed * MathHelper.Lerp(0.8f, 1.0f, player.traits.ballControl)
 
-            if canControl && isBallGoingTowardsPlayer && dist < 0.5f * controlMaxDistance then                        
-                Pushed(playerId, player.speed * pushSpeedFactor * (2.0f - player.traits.ballControl) * (vector3Of2 player.direction))
+            if canControl && isBallGoingTowardsPlayer && dist < pushedDistance then
+                let factor = MathHelper.Lerp(maxPushSpeedFactor, minPushSpeedFactor, player.traits.ballControl)
+                Pushed(playerId, player.speed * factor * (vector3Of2 player.direction))
             else
                 Free
     else

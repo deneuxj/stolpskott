@@ -78,7 +78,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
         let pad = Input.GamePad.GetState(playerIndex)
         let playerState =
-            Controls.updateControl config prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) state.Value.player
+            Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) state.Value.player
         let playerState = Player.updateKeyFrame dt playerState
         let playerState = Player.updatePlayer dt playerState
         

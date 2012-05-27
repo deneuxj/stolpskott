@@ -40,13 +40,13 @@ type State =
 let getRunSpeed { traits = { speed = speed }; health = health; condition = condition } =
     speed * health * condition / 1.0f<he sta>
 
-let updateKeyFrame (dt : float32<s>) player =
-    let jumpingLength = 2.0f<s>
-    let tacklingLength = 2.0f<s>
-    let kickingLength = 0.2f<s>
-    let fallenLength = 1.0f<s>
-    let keeperDiveLength = 0.75f<s>
+let jumpingLength = 2.0f<s>
+let tacklingLength = 2.0f<s>
+let kickingLength = 0.2f<s>
+let fallenLength = 1.0f<s>
+let keeperDiveLength = 0.75f<s>
 
+let updateKeyFrame (dt : float32<s>) player =
     let activity =
         match player.activity with
         | Standing -> Standing
