@@ -54,7 +54,6 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
                   inPlay = Ball.InPlay
                 }
         }
-    let controller = ref Controls.Running
     let mutable prePad = Input.GamePad.GetState(playerIndex)
 
     override this.LoadContent() =
@@ -78,8 +77,8 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
         let hasBallControl =
             (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
         let pad = Input.GamePad.GetState(playerIndex)
-        let control, playerState =
-            Controls.updateControl config prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) (controller.Value, state.Value.player)
+        let playerState =
+            Controls.updateControl config prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) state.Value.player
         let playerState = Player.updateKeyFrame dt playerState
         let playerState = Player.updatePlayer dt playerState
         
@@ -98,7 +97,6 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
                 ballState
 
         prePad <- pad
-        controller := control
         state := { state.Value with player = playerState ; ball = ballState }
 
     override this.Draw(_) =
