@@ -208,7 +208,7 @@ let discretizeTrigo x =
     
 let runningFrames = [| 0 .. 3 |]
 let tacklingFrames = Array.concat [[| 3 .. 8 |] ; [| 8;8;8;8;8 |]]
-let jumpingFrames = Array.concat [[|3|] ; [| 9 .. 14 |]]
+let jumpingFrames = Array.concat [[|3|] ; [| 9 .. 13 |]]
 
 let getFrame frames (kf : float32<kf>) =
     let num = Array.length frames
