@@ -59,6 +59,7 @@
     <Compile Include="Ball.fs" />
     <Compile Include="Player.fs" />
     <Compile Include="Controls.fs" />
+    <Compile Include="Pitch.fs" />
     <Compile Include="Physics.fs" />
     <Compile Include="Team.fs" />
     <Compile Include="Rendering.fs" />

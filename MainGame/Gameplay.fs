@@ -23,7 +23,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
           kick = fun state -> state.Triggers.Right > 0.1f
           cross = fun state -> state.Buttons.RightShoulder = Input.ButtonState.Pressed
         }
-    let pitch : Team.PitchTraits =
+    let pitch : Pitch.PitchTraits =
         { width = 68.0f<m>
           length = 105.0f<m>
         }

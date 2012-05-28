@@ -36,17 +36,7 @@ let transform sx sy tx ty pos =
     { x = pos.x * sx + tx
       y = pos.y * sy + ty }
 
-let penaltyBoxWidth = 40.3f<m>
-let penaltyBoxHeight = 16.5f<m>
-let goalBoxWidth = penaltyBoxWidth - 22.0f<m>
-let goalBoxHeight = 5.5f<m>
-
-type PitchTraits =
-    { width : float32<m>
-      length : float32<m>
-    }
-
-let boundBall pitch (ball : Ball.State) =
+let boundBall (pitch : Pitch.PitchTraits) (ball : Ball.State) =
     let speed =
         if abs ball.pos.X > 5.0f<m> + pitch.width / 2.0f ||
            abs ball.pos.Y > 5.0f<m> + pitch.length / 2.0f then
@@ -60,7 +50,7 @@ type GameState =
     { teamA : Team
       teamB : Team
       ball : Ball.State
-      pitch : PitchTraits
+      pitch : Pitch.PitchTraits
       period : MatchPeriod
       periodTime : float32<s>
     }
@@ -70,7 +60,7 @@ and Team =
       tactics : GameState -> PitchRelPos[]
     }
 
-let getRelPos pitch isTeamAttackingUp (v : TypedVector2<m>) =
+let getRelPos (pitch : Pitch.PitchTraits) isTeamAttackingUp (v : TypedVector2<m>) =
     let x = v.X / pitch.width
     let y = v.Y / pitch.length
     let k = if not isTeamAttackingUp then -1.0f else 1.0f

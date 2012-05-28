@@ -121,7 +121,7 @@ let renderLines
     (sb : SpriteBatch)
     (viewWidth : float32<m>, viewHeight : float32<m>)
     (whiteLine : Texture2D)
-    (pitch : Team.PitchTraits)
+    (pitch : Pitch.PitchTraits)
     (viewX : float32<m>, viewY : float32<m>) =
 
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
@@ -152,10 +152,10 @@ let renderLines
     drawVLine (x1, y0) y1
 
     // upper penalty box
-    let x0 = -Team.penaltyBoxWidth / 2.0f
+    let x0 = -Pitch.penaltyBoxWidth / 2.0f
     let x1 = -x0
     let y0 = pitch.length / 2.0f
-    let y1 = y0 - Team.penaltyBoxHeight
+    let y1 = y0 - Pitch.penaltyBoxHeight
 
     drawVLine (x0, y0) y1
     drawVLine (x1, y0) y1
@@ -163,27 +163,27 @@ let renderLines
 
     // lower penalty box
     let y0 = -pitch.length / 2.0f
-    let y1 = y0 + Team.penaltyBoxHeight
+    let y1 = y0 + Pitch.penaltyBoxHeight
 
     drawVLine (x0, y0) y1
     drawVLine (x1, y0) y1
     drawHLine (x0, y1) x1
 
     // upper six-yards box
-    let x0 = -Team.goalBoxWidth / 2.0f
+    let x0 = -Pitch.goalBoxWidth / 2.0f
     let x1 = -x0
     let y0 = pitch.length / 2.0f
-    let y1 = y0 - Team.goalBoxHeight
+    let y1 = y0 - Pitch.goalBoxHeight
 
     drawVLine (x0, y0) y1
     drawVLine (x1, y0) y1
     drawHLine (x0, y1) x1
 
     // lower six-yards box
-    let x0 = -Team.goalBoxWidth / 2.0f
+    let x0 = -Pitch.goalBoxWidth / 2.0f
     let x1 = -x0
     let y0 = -pitch.length / 2.0f
-    let y1 = y0 + Team.goalBoxHeight
+    let y1 = y0 + Pitch.goalBoxHeight
 
     drawVLine (x0, y0) y1
     drawVLine (x1, y0) y1
@@ -219,7 +219,7 @@ let getFrame frames (kf : float32<kf>) =
         |> max 0
     frames.[idx]
 
-let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper goalLower (pitch : Team.PitchTraits) (viewX, viewY) sprites =
+let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper goalLower (pitch : Pitch.PitchTraits) (viewX, viewY) sprites =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
     for s in sprites do
