@@ -62,6 +62,9 @@
     <Compile Include="Pitch.fs" />
     <Compile Include="Physics.fs" />
     <Compile Include="Team.fs" />
+    <Compile Include="Match.fs" />
+    <Compile Include="Tactics.fs" />
+    <Compile Include="PlayerAi.fs" />
     <Compile Include="Rendering.fs" />
     <Compile Include="Gameplay.fs" />
     <Compile Include="AssemblyInfo.fs" />

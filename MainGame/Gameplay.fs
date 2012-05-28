@@ -83,13 +83,13 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
         let playerState = Player.updateKeyFrame dt playerState
         let playerState = Player.updatePlayer dt playerState
         
-        let ballState, impulse = Physics.updateBall goalCenters dt [| ((Team.TeamA, 0), playerState) |] state.Value.ball
+        let ballState, impulse = Physics.updateBall goalCenters dt [| ((Match.TeamA, 0), playerState) |] state.Value.ball
         let ballState =
             match impulse with
-            | Physics.Trapped owner when owner = (Team.TeamA, 0) ->
+            | Physics.Trapped owner when owner = (Match.TeamA, 0) ->
                 { ballState with pos = TypedVector3<m>(playerState.pos.X, playerState.pos.Y, Ball.ballRadius) }
             | _ -> ballState
-            |> Team.boundBall pitch
+            |> Pitch.boundBall pitch
 
         let ballState =
             if Input.Keyboard.GetState().IsKeyDown(Input.Keys.Space) then

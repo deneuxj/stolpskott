@@ -15,3 +15,13 @@ type PitchTraits =
     { width : float32<m>
       length : float32<m>
     }
+
+let boundBall (pitch : PitchTraits) (ball : Ball.State) =
+    let speed =
+        if abs ball.pos.X > 5.0f<m> + pitch.width / 2.0f ||
+           abs ball.pos.Y > 5.0f<m> + pitch.length / 2.0f then
+            TypedVector3<m/s>(0.0f<_>, 0.0f<_>, ball.speed.Z)
+        else
+            ball.speed
+
+    { ball with speed = speed }

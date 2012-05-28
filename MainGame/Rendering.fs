@@ -38,7 +38,7 @@ let inline cmp (o1 : #System.IComparable<'T>) (o2 : #System.IComparable<'T>) =
 
 type SpriteType =
     | Ball of Ball.State
-    | Player of Player.State * Team.TeamSide
+    | Player of Player.State * Match.TeamSide
     | GoalUpper
     | GoalLower
 with
@@ -280,7 +280,7 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
         let sprites =
             [| GoalUpper
                GoalLower
-               Player(playerState, Team.TeamA)
+               Player(playerState, Match.TeamA)
                Ball(ballState) |]
         Array.sortInPlaceWith (fun this other -> SpriteType.Compare(this, other)) sprites
         renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) sprites
@@ -288,7 +288,7 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
         sb.End()
 
 
-let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBatch) viewSize resources (state : Team.GameState) : unit =
+let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBatch) viewSize resources (state : Match.MatchState) : unit =
     let viewPos = 
         let viewX = state.ball.pos.X |> max (-state.pitch.width * 0.5f) |> min (state.pitch.width * 0.5f)
         let viewY = state.ball.pos.Y |> max (-state.pitch.length * 0.5f) |> min (state.pitch.length * 0.5f)
@@ -297,9 +297,9 @@ let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBa
     let sprites =
         [|
             for player in state.teamA.onPitch do
-                yield Player(player, Team.TeamA)
+                yield Player(player, Match.TeamA)
             for player in state.teamB.onPitch do
-                yield Player(player, Team.TeamB)
+                yield Player(player, Match.TeamB)
             yield GoalUpper
             yield GoalLower
             yield Ball(state.ball)
