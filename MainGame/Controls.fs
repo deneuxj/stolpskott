@@ -13,6 +13,7 @@ type Configuration =
     { direction : GamePadState -> float32 * float32
       trap : GamePadState -> bool
       kick : GamePadState -> bool
+      cross : GamePadState -> bool
     }
 
 let updateControl config dt prePad pad hasBallControl isBallHigh (player : Player.State) =
@@ -32,9 +33,14 @@ let updateControl config dt prePad pad hasBallControl isBallHigh (player : Playe
             | _, true -> { player with activity = Player.Jumping 0.0f<kf> }
             | true, false -> { player with activity = Player.Kicking(0.0f<kf>) }
             | false, false -> { player with activity = Player.Tackling(0.0f<kf>, false) }
+        elif config.cross pad && hasBallControl && not isBallHigh then
+            { player with activity = Crossing }
         else
             { player with activity = Standing ; direction = dir ; speed = speed }
-        
+
+    | Player.Crossing ->
+        { player with activity = Standing }
+                
     | Player.Jumping _ ->
         player
 

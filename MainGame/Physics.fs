@@ -52,6 +52,8 @@ let hardKickElevation = 0.2f // Controls how fast the ball goes up upon leaving 
 let hardKickSpeed = 40.0f<m/s> // How fast the ball goes forward upon leaving the foot of the kicker
 let softKickElevation = 0.1f
 let softKickSpeed = 20.0f<m/s>
+let crossKickSpeed = 25.0f<m/s>
+let crossKickElevation = 0.3f
 
 let makeKick (kickElevation : float32<1>) (kickSpeed : float32<m/s>) (ballControl : float32<bc>) (direction : TypedVector2<1>) =
     let kickHeight =
@@ -87,6 +89,13 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
         | Player.Passing ->
             if dist < controlMaxDistance then
                 let kick = makeKick softKickElevation softKickSpeed player.traits.ballControl player.direction
+                Kicked(playerId, kick)
+            else
+                Free
+
+        | Player.Crossing ->
+            if dist < controlMaxDistance then
+                let kick = makeKick crossKickElevation crossKickSpeed player.traits.ballControl player.direction
                 Kicked(playerId, kick)
             else
                 Free

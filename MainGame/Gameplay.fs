@@ -21,6 +21,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
         { direction = fun state -> state.ThumbSticks.Left.X, state.ThumbSticks.Left.Y
           trap = fun state -> state.Triggers.Left > 0.1f
           kick = fun state -> state.Triggers.Right > 0.1f
+          cross = fun state -> state.Buttons.RightShoulder = Input.ButtonState.Pressed
         }
     let pitch : Team.PitchTraits =
         { width = 68.0f<m>
