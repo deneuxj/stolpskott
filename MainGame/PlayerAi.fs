@@ -49,18 +49,12 @@ let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.Ma
 
         min t0 t1
 
-    let (|DeadBall|LiveBall|) = function
-        | Ball.InPlay -> LiveBall
-        | Ball.DeadBall _
-        | Ball.OutOfPitch
-        | Ball.TrappedByKeeper _ -> DeadBall
-
     match gameState0.ball.inPlay, gameState1.ball.inPlay with
-    | _, DeadBall ->
+    | _, Ball.DeadBall _ ->
         team1.onPitch
         |> Array.map (fun _ -> FollowingTactic)
     
-    | DeadBall, LiveBall ->
+    | Ball.DeadBall _, Ball.LiveBall ->
         let runToBall, _ =
             team1.onPitch
             |> Seq.mapi (fun i player -> (i, timeToBall player))
@@ -69,7 +63,7 @@ let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.Ma
         team1.onPitch
         |> Array.mapi (fun i _ -> if i = runToBall then RunningToBall else FollowingTactic)
 
-    | LiveBall, LiveBall ->
+    | Ball.LiveBall, Ball.LiveBall ->
         let goalPos =
             match attackUp with
             | true -> TypedVector2<m>(gameState1.pitch.length / 2.0f, gameState1.pitch.width / 2.0f)

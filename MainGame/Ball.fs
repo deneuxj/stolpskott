@@ -5,11 +5,27 @@ open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils
 open Team
 
+type PitchSide = Left | Right
+
 type InPlay =
     | InPlay
-    | DeadBall of TeamSide
-    | OutOfPitch
+    | CornerKick of TeamSide * PitchSide
+    | KickIn of TeamSide * PitchSide
+    | KickOff of TeamSide
+    | ThrowIn of TeamSide * PitchSide * float32<m>
+    | Penalty of TeamSide
+    | FreeKick of TeamSide * TypedVector2<m>
     | TrappedByKeeper of TeamSide
+
+let (|DeadBall|LiveBall|) = function
+    | InPlay -> LiveBall
+    | KickIn (team, _)
+    | KickOff (team)
+    | ThrowIn (team, _, _)
+    | Penalty (team)
+    | FreeKick (team, _)
+    | TrappedByKeeper team
+    | CornerKick (team, _) -> DeadBall (Some team)
 
 type State =
     { pos : TypedVector3<m>
