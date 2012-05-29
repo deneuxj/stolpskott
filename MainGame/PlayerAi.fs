@@ -51,11 +51,9 @@ let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.Ma
 
     let (|DeadBall|LiveBall|) = function
         | Ball.InPlay -> LiveBall
-        | Ball.DeadBallTeamA
-        | Ball.DeadBallTeamB
+        | Ball.DeadBall _
         | Ball.OutOfPitch
-        | Ball.TrappedByKeeperA
-        | Ball.TrappedByKeeperB -> DeadBall
+        | Ball.TrappedByKeeper _ -> DeadBall
 
     match gameState0.ball.inPlay, gameState1.ball.inPlay with
     | _, DeadBall ->

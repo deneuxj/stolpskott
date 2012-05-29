@@ -3,14 +3,13 @@
 open Microsoft.Xna.Framework
 open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils
+open Team
 
 type InPlay =
     | InPlay
-    | DeadBallTeamA
-    | DeadBallTeamB
+    | DeadBall of TeamSide
     | OutOfPitch
-    | TrappedByKeeperA
-    | TrappedByKeeperB
+    | TrappedByKeeper of TeamSide
 
 type State =
     { pos : TypedVector3<m>

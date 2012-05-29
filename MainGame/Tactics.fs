@@ -30,10 +30,10 @@ let tactics formation side (game : Match.MatchState) =
     let ballPos = TypedVector2(game.ball.pos.X, game.ball.pos.Y) |> getRelPos
     let isDefending = 
         match side, game.ball.inPlay with
-        | Team.TeamA, Ball.DeadBallTeamB
-        | Team.TeamB, Ball.DeadBallTeamA
-        | Team.TeamA, Ball.TrappedByKeeperB
-        | Team.TeamB, Ball.TrappedByKeeperA
+        | Team.TeamA, Ball.DeadBall Team.TeamB
+        | Team.TeamB, Ball.DeadBall Team.TeamA
+        | Team.TeamA, Ball.TrappedByKeeper Team.TeamB
+        | Team.TeamB, Ball.TrappedByKeeper Team.TeamA
         | _, Ball.InPlay when ballPos.y < 0.0f -> true
         | _ -> false
 
@@ -88,18 +88,18 @@ let tactics formation side (game : Match.MatchState) =
             (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
 
         // Trapped by own keeper
-        | Team.TeamA, Ball.TrappedByKeeperA
-        | Team.TeamB, Ball.TrappedByKeeperB ->
+        | Team.TeamA, Ball.TrappedByKeeper Team.TeamA
+        | Team.TeamB, Ball.TrappedByKeeper Team.TeamB ->
             0.0f, 0.5f
 
         // Trapped by the opponent's keeper
-        | Team.TeamA, Ball.TrappedByKeeperB
-        | Team.TeamB, Ball.TrappedByKeeperA ->
+        | Team.TeamA, Ball.TrappedByKeeper Team.TeamB
+        | Team.TeamB, Ball.TrappedByKeeper Team.TeamA ->
             0.0f, 0.5f
 
         // Dead ball, our team.
-        | Team.TeamA, Ball.DeadBallTeamA
-        | Team.TeamB, Ball.DeadBallTeamB ->
+        | Team.TeamA, Ball.DeadBall Team.TeamA
+        | Team.TeamB, Ball.DeadBall Team.TeamB ->
             let baseY, topY =
                 // Free kick, penalty or corner in the opponent's side
                 if ballPos.y > 0.0f then
@@ -109,8 +109,8 @@ let tactics formation side (game : Match.MatchState) =
             (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
 
         // Dead ball, opponents
-        | Team.TeamB, Ball.DeadBallTeamA
-        | Team.TeamA, Ball.DeadBallTeamB ->
+        | Team.TeamB, Ball.DeadBall Team.TeamA
+        | Team.TeamA, Ball.DeadBall Team.TeamB ->
             let baseY, topY =
                 // Corner or free kick close to the line
                 if ballPos.y < 0.1f then
