@@ -30,10 +30,10 @@ let tactics formation side (game : Match.MatchState) =
     let ballPos = TypedVector2(game.ball.pos.X, game.ball.pos.Y) |> getRelPos
     let isDefending = 
         match side, game.ball.inPlay with
-        | Match.TeamA, Ball.DeadBallTeamB
-        | Match.TeamB, Ball.DeadBallTeamA
-        | Match.TeamA, Ball.TrappedByKeeperB
-        | Match.TeamB, Ball.TrappedByKeeperA
+        | Team.TeamA, Ball.DeadBallTeamB
+        | Team.TeamB, Ball.DeadBallTeamA
+        | Team.TeamA, Ball.TrappedByKeeperB
+        | Team.TeamB, Ball.TrappedByKeeperA
         | _, Ball.InPlay when ballPos.y < 0.0f -> true
         | _ -> false
 
@@ -79,8 +79,8 @@ let tactics formation side (game : Match.MatchState) =
                 // Attackers follow the opponent's back line.
                 let opponents =
                     match side with
-                    | Match.TeamA -> game.teamB
-                    | Match.TeamB -> game.teamA
+                    | Team.TeamA -> game.teamB
+                    | Team.TeamB -> game.teamA
                 opponents.onPitch
                 |> Seq.map (fun player -> player.pos |> getRelPos)
                 |> Seq.map (fun { y = y } -> y )
@@ -88,18 +88,18 @@ let tactics formation side (game : Match.MatchState) =
             (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
 
         // Trapped by own keeper
-        | Match.TeamA, Ball.TrappedByKeeperA
-        | Match.TeamB, Ball.TrappedByKeeperB ->
+        | Team.TeamA, Ball.TrappedByKeeperA
+        | Team.TeamB, Ball.TrappedByKeeperB ->
             0.0f, 0.5f
 
         // Trapped by the opponent's keeper
-        | Match.TeamA, Ball.TrappedByKeeperB
-        | Match.TeamB, Ball.TrappedByKeeperA ->
+        | Team.TeamA, Ball.TrappedByKeeperB
+        | Team.TeamB, Ball.TrappedByKeeperA ->
             0.0f, 0.5f
 
         // Dead ball, our team.
-        | Match.TeamA, Ball.DeadBallTeamA
-        | Match.TeamB, Ball.DeadBallTeamB ->
+        | Team.TeamA, Ball.DeadBallTeamA
+        | Team.TeamB, Ball.DeadBallTeamB ->
             let baseY, topY =
                 // Free kick, penalty or corner in the opponent's side
                 if ballPos.y > 0.0f then
@@ -109,8 +109,8 @@ let tactics formation side (game : Match.MatchState) =
             (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
 
         // Dead ball, opponents
-        | Match.TeamB, Ball.DeadBallTeamA
-        | Match.TeamA, Ball.DeadBallTeamB ->
+        | Team.TeamB, Ball.DeadBallTeamA
+        | Team.TeamA, Ball.DeadBallTeamB ->
             let baseY, topY =
                 // Corner or free kick close to the line
                 if ballPos.y < 0.1f then

@@ -15,8 +15,8 @@ type AiPlayerObjective =
 let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.MatchState) =
     let team0, team1 =
         match side with
-        | Match.TeamA -> gameState0.teamA, gameState1.teamA
-        | Match.TeamB -> gameState0.teamB, gameState1.teamB
+        | Team.TeamA -> gameState0.teamA, gameState1.teamA
+        | Team.TeamB -> gameState0.teamB, gameState1.teamB
 
     let attackUp = Match.isTeamAttackingUp side gameState1.period
 

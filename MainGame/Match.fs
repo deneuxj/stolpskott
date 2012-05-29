@@ -3,7 +3,7 @@
 open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils
 
-type TeamSide = TeamA | TeamB
+open Team
 
 type MatchPeriod =
     | FirstHalf
