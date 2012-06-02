@@ -14,6 +14,12 @@ let getRelPos (pitch : Pitch.PitchTraits) isTeamAttackingUp (v : TypedVector2<m>
     let v = TypedVector.scale2(k, TypedVector2<1>(x, y))
     { x = v.X; y = v.Y }
 
+let getAbsPos (pitch : Pitch.PitchTraits) isTeamAttackingUp pos =
+    let x = pos.x * pitch.width
+    let y = pos.y * pitch.length
+    let k = if not isTeamAttackingUp then -1.0f else 1.0f
+    TypedVector2<m>(x, y)
+
 let transform sx sy tx ty pos =
     { x = pos.x * sx + tx
       y = pos.y * sy + ty }

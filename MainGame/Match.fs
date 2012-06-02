@@ -13,6 +13,7 @@ type MatchPeriod =
     | TieFirstHalf
     | TieSecondHalf
     | TieExtra
+    | MatchOver
 
 let isTeamAttackingUp side period =
     let inverted =

@@ -2,6 +2,9 @@
 
 open CleverRake.XnaUtils
 open CleverRake.XnaUtils.Units
+open CleverRake.XnaUtils.CoopMultiTasking
+
+open Units
 
 type AiPlayerObjective =
     | RunningToBall
@@ -12,6 +15,183 @@ type AiPlayerObjective =
     | CrossingTo of TypedVector2<m>
     | ShootingAtGoal
 
+
+let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) =
+    let team  =
+        match side with
+        | Team.TeamA -> getMatchState().teamA
+        | Team.TeamB -> getMatchState().teamB
+        
+    let attackUp() = Match.isTeamAttackingUp side (getMatchState().period)
+    let getRelPos pos = Tactics.getRelPos (getMatchState().pitch) (attackUp()) pos
+    let getAbsPos pos = Tactics.getAbsPos (getMatchState().pitch) (attackUp()) pos
+
+    let waitUntilBallInPlay =
+        task {
+            return! env.WaitUntil <|
+                fun () ->
+                    match getMatchState().ball.inPlay with
+                    | Ball.InPlay -> true
+                    | _ -> false
+        }
+
+    let prepareForKickOff =
+        task {
+            // Goal keeper goes to the goal
+            getAbsPos { x = 0.0f ; y = -1.0f } |> RunningTo |> assign 0
+
+            // Field players place themselves according to the formation            
+            let destinations =
+                formation
+                |> List.map (Tactics.transform 0.8f 0.4f 0.1f 0.1f)
+                |> List.map getAbsPos
+                // Field players stand out of the circle.
+                |> List.map (fun v ->
+                    let dist = v.Length
+                    if dist < 9.15f<m> then
+                        let v = 1.0f / dist * v
+                        9.15f<m> * v
+                    else
+                        v)
+                |> Array.ofList
+
+            // If the ball is ours, the two players closest to the ball go to it
+            let ballIsOurs =
+                match getMatchState().ball.inPlay with
+                | Ball.KickOff owner when owner = side -> true
+                | _ -> false
+
+            if ballIsOurs then
+                let _, ((player0, _), (player1, _)) =
+                    destinations
+                    |> Array.fold (fun (i, ((i0, d0), (i1, d1) as x)) v ->
+                        let d = v.Length
+                        let matches =
+                            if d < d0 then
+                                ((i, d), (i0, d0))
+                            elif d < d1 then
+                                ((i0, d0), (i, d))
+                            else
+                                x
+                        (i + 1, matches)) (0, ((-1, 1000.0f<m>), (-1, 1000.0f<m>)))
+                 
+                if player0 < 0 || player0 >= destinations.Length ||
+                    player1 < 0 || player1 >= destinations.Length then
+                    failwith "Could not find two players to kick off the ball"
+
+                destinations.[player0] <- TypedVector2<m>.Zero
+                destinations.[player1] <- TypedVector2<m>(0.0f<m>, 2.0f<m>)
+            
+                destinations
+                |> Array.iteri(fun i v -> RunningTo v |> assign i)
+
+                do! waitUntilBallInPlay
+
+                PassingTo player1 |> assign player0
+            else
+                destinations
+                |> Array.iteri(fun i v -> RunningTo v |> assign i)
+
+                do! waitUntilBallInPlay                                        
+        }
+
+    let normalPlay =
+        task {
+            return ()
+        }
+
+    let defendCorner =
+        task {
+            return ()
+        }
+
+    let kickCorner =
+        task {
+            return ()
+        }
+
+    let defendThrowIn =
+        task {
+            return ()
+        }
+
+    let throwIn =
+        task {
+            return ()
+        }
+
+    let defendFreeKick =
+        task {
+            return ()
+        }
+
+    let freeKick =
+        task {
+            return ()
+        }
+
+    let defendPenalty =
+        task {
+            return ()
+        }
+
+    let kickPenalty =
+        task {
+            return ()
+        }
+
+    let celebrate =
+        task {
+            return ()
+        }
+
+    let matchIsOver() =
+        match getMatchState().period with
+        | Match.MatchOver -> true
+        | _ -> false
+
+    let rec main() =
+        task {
+            match getMatchState() with
+            | { period = Match.MatchOver } -> return ()
+            | { ball = { inPlay = Ball.KickOff _ } } ->
+                do! prepareForKickOff
+                return! main()
+            | _ ->
+                do! normalPlay
+                return! main()
+        }
+
+    main()
+
+
+let actPlayerOnObjective side (ball : Ball.State) objective (playerState : Player.State) =
+    let runToPos destination =
+        let dir = destination - playerState.pos
+        let dist = dir.Length
+        if dist > 0.1f<m> then
+            let dir = 1.0f / dist * dir
+            { playerState with direction = dir; activity = Player.Standing; speed = Player.getRunSpeed playerState }
+        else
+            { playerState with activity = Player.Standing; speed = 0.0f<m/s> }
+
+    match objective, playerState.activity with
+    | _, Player.Fallen _
+    | _, Player.Jumping _
+    | _, Player.KeeperDive _
+    | _, Player.Kicking _
+    | _, Player.Tackling _ ->
+        // Player unavailable, activity cannot be changed
+        playerState
+    | RunningTo dest, _ ->
+        runToPos dest
+    | RunningToBall, _ ->
+        runToPos (TypedVector2<m>(ball.pos.X, ball.pos.Y))
+    | _, _ ->
+        playerState
+
+
+(*
 let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.MatchState) =
     let team0, team1 =
         match side with
@@ -140,3 +320,4 @@ let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.Ma
                     RunningToBall
             else
                 FollowingTactic)
+*)

@@ -85,6 +85,11 @@
     <Reference Include="System.Numerics" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\xnautils\CoopMultiTasking\CoopMultiTasking.fsproj">
+      <Name>CoopMultiTasking</Name>
+      <Project>{7bde5138-ff45-40c3-ad86-7c614b7ad779}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\..\xnautils\Core\Core.fsproj">
       <Name>Core</Name>
       <Project>{cbff8e99-b91a-4adc-a0ad-502616413116}</Project>
