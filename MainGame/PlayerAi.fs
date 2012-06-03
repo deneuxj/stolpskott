@@ -43,7 +43,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             // Field players place themselves according to the formation            
             let destinations =
                 formation
-                |> List.map (Tactics.transform 0.8f 0.4f 0.1f 0.1f)
+                |> List.map (Tactics.transform 0.8f 0.4f 0.0f -0.4f)
                 |> List.map getAbsPos
                 // Field players stand out of the circle.
                 |> List.map (fun v ->
@@ -79,8 +79,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     player1 < 0 || player1 >= destinations.Length then
                     failwith "Could not find two players to kick off the ball"
 
-                destinations.[player0] <- TypedVector2<m>.Zero
-                destinations.[player1] <- TypedVector2<m>(0.0f<m>, 2.0f<m>)
+                destinations.[player0] <- TypedVector2<m>(-2.0f<m>, 0.0f<m>)
+                destinations.[player1] <- TypedVector2<m>(2.0f<m>, 0.0f<m>)
             
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)

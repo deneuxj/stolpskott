@@ -37,7 +37,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             teamA =
                 { onPitch =
                     [| for i in 1..11 ->        
-                        { pos = TypedVector2<m>(0.0f<m>, -3.0f<m>)
+                        { pos = TypedVector2<m>(-50.0f<m>, -3.0f<m>)
                           direction = TypedVector2<1>(0.0f, 1.0f)
                           speed = 0.0f<m/s>
                           travelled = 0.0f<m>
@@ -126,7 +126,13 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             teamA
             |> Array.mapi (fun i playerState -> (Team.TeamA, i), playerState)
 
-        let ballState, impulse = Physics.updateBall goalCenters dt allPlayers state.Value.ball
+        let ballState, impulse =
+            match state.Value.ball.inPlay with
+            | Ball.LiveBall -> 
+                Physics.updateBall goalCenters dt allPlayers state.Value.ball
+            | Ball.DeadBall _ ->
+                state.Value.ball, Physics.Free
+
         let ballState =
             match impulse with
             | Physics.Trapped (Team.TeamA, idx) ->
