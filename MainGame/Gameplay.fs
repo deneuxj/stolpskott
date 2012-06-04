@@ -80,6 +80,21 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
     let scheduler = new Scheduler()
     let env = new Environment(scheduler)
 
+    let mutable x = 0.0f<m>
+    let mutable y = 0.0f<m>
+
+    member this.UpdateDebugView(dt : float32<s>) =
+        let kbState = Input.Keyboard.GetState()
+        let velocity = 20.0f<m/s>
+        if kbState.IsKeyDown(Input.Keys.Up) then
+            y <- y + velocity * dt
+        if kbState.IsKeyDown(Input.Keys.Down) then
+            y <- y - velocity * dt
+        if kbState.IsKeyDown(Input.Keys.Left) then
+            x <- x - velocity * dt
+        if kbState.IsKeyDown(Input.Keys.Right) then
+            x <- x + velocity * dt
+
     override this.Initialize() =
         base.Initialize()
 
@@ -104,6 +119,8 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
 
     override this.Update(gt) =
         let dt = 1.0f<s> * float32 gt.ElapsedGameTime.TotalSeconds
+        this.UpdateDebugView(dt)
+
         scheduler.RunFor (float32 dt)
 
         let pad = Input.GamePad.GetState(playerIndex)
@@ -156,5 +173,5 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             let allPlayers =
                 state.Value.teamA.onPitch
                 |> Array.map (fun playerState -> (Team.TeamA, playerState))
-            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, state.Value.ball)
+            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, state.Value.ball, (x, y))
         | _ -> ()

@@ -265,13 +265,13 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
 
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, allPlayers, ballState : Ball.State) =
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, allPlayers, ballState : Ball.State, (x, y)) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
-    let x, y = ballState.pos.X, ballState.pos.Y
+    //let x, y = ballState.pos.X, ballState.pos.Y
 
     sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
     try
