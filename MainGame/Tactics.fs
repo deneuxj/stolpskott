@@ -8,17 +8,25 @@ open CleverRake.XnaUtils.Units
 type PitchRelPos = { x : float32; y : float32 }
 
 let getRelPos (pitch : Pitch.PitchTraits) isTeamAttackingUp (v : TypedVector2<m>) =
-    let x = v.X / pitch.width
-    let y = v.Y / pitch.length
+    let x = 2.0f * v.X / pitch.width
+    let y = 2.0f * v.Y / pitch.length
     let k = if not isTeamAttackingUp then -1.0f else 1.0f
     let v = TypedVector.scale2(k, TypedVector2<1>(x, y))
     { x = v.X; y = v.Y }
 
 let getAbsPos (pitch : Pitch.PitchTraits) isTeamAttackingUp pos =
-    let x = pos.x * pitch.width
-    let y = pos.y * pitch.length
+    let x = 0.5f * pos.x * pitch.width
+    let y = 0.5f * pos.y * pitch.length
     let k = if not isTeamAttackingUp then -1.0f else 1.0f
     TypedVector2<m>(x, y)
+
+let getAbsDir isTeamAttackingUp (dir : TypedVector2<1>) =
+    if isTeamAttackingUp then
+        dir
+    else
+        -1.0f * dir
+
+let getRelDir = getAbsDir
 
 let transform sx sy tx ty pos =
     { x = pos.x * sx + tx
