@@ -10,7 +10,7 @@ type AiPlayerObjective =
     | RunningToBall
     | RunningWithBallTo of TypedVector2<m>
     | FollowingTactic
-    | RunningTo of TypedVector2<m>
+    | RunningTo of TypedVector2<m> * TypedVector2<1>
     | PassingTo of int
     | CrossingTo of TypedVector2<m>
     | ShootingAtGoal
@@ -25,6 +25,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     let attackUp() = Match.isTeamAttackingUp side (getMatchState().period)
     let getRelPos pos = Tactics.getRelPos (getMatchState().pitch) (attackUp()) pos
     let getAbsPos pos = Tactics.getAbsPos (getMatchState().pitch) (attackUp()) pos
+    let getAbsDir dir = Tactics.getAbsDir (attackUp()) dir
+    let absUp = TypedVector2<1>(0.0f, 1.0f) |> getAbsDir
 
     let waitUntilBallInPlay =
         task {
@@ -38,12 +40,12 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     let prepareForKickOff =
         task {
             // Goal keeper goes to the goal
-            getAbsPos { x = 0.0f ; y = -1.0f } |> RunningTo |> assign 0
+            (getAbsPos { x = 0.0f ; y = -1.0f }, absUp) |> RunningTo |> assign 0
 
             // Field players place themselves according to the formation            
             let destinations =
                 formation
-                |> List.map (Tactics.transform 0.8f 0.4f 0.0f -0.4f)
+                |> List.map (Tactics.transform 0.8f 0.25f 0.0f -0.25f)
                 |> List.map getAbsPos
                 // Field players stand out of the circle.
                 |> List.map (fun v ->
@@ -53,6 +55,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                         9.15f<m> * v
                     else
                         v)
+                |> List.map (fun dest -> (dest, getAbsDir absUp))
                 |> Array.ofList
 
             // If the ball is ours, the two players closest to the ball go to it
@@ -64,7 +67,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             if ballIsOurs then
                 let _, ((player0, _), (player1, _)) =
                     destinations
-                    |> Array.fold (fun (i, ((i0, d0), (i1, d1) as x)) v ->
+                    |> Array.fold (fun (i, ((i0, d0), (i1, d1) as x)) (v, _) ->
                         let d = v.Length
                         let matches =
                             if d < d0 then
@@ -79,8 +82,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     player1 < 0 || player1 >= destinations.Length then
                     failwith "Could not find two players to kick off the ball"
 
-                destinations.[player0] <- TypedVector2<m>(-2.0f<m>, 0.0f<m>)
-                destinations.[player1] <- TypedVector2<m>(2.0f<m>, 0.0f<m>)
+                destinations.[player0] <- TypedVector2<m>(-2.0f<m>, 0.0f<m>), absUp
+                destinations.[player1] <- TypedVector2<m>(2.0f<m>, 0.0f<m>), absUp
             
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)
@@ -183,8 +186,11 @@ let actPlayerOnObjective side (ball : Ball.State) objective (playerState : Playe
     | _, Player.Tackling _ ->
         // Player unavailable, activity cannot be changed
         playerState
-    | RunningTo dest, _ ->
-        runToPos dest
+    | RunningTo (dest, dir), _ ->
+        let newState = runToPos dest
+        match newState with
+        | { speed = 0.0f<m/s> } -> { newState with direction = dir }
+        | _ -> newState
     | RunningToBall, _ ->
         runToPos (TypedVector2<m>(ball.pos.X, ball.pos.Y))
     | _, _ ->
