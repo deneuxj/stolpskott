@@ -65,6 +65,7 @@
     <Compile Include="Match.fs" />
     <Compile Include="Tactics.fs" />
     <Compile Include="PlayerAi.fs" />
+    <Compile Include="Referee.fs" />
     <Compile Include="Rendering.fs" />
     <Compile Include="Gameplay.fs" />
     <Compile Include="AssemblyInfo.fs" />

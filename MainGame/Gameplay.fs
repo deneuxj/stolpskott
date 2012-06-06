@@ -65,7 +65,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             ball =
                 { pos = TypedVector3<m>(0.0f<m>, 0.0f<m>, 1.0f<m>)
                   speed = TypedVector3<m/s>(0.0f<m/s>, 0.0f<m/s>, 0.0f<m/s>)
-                  inPlay = Ball.KickOff Team.TeamA
+                  inPlay = Ball.KickOff(Ball.WaitWhistle, Team.TeamA)
                 }
         }
 
@@ -99,6 +99,12 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
         base.Initialize()
 
         PlayerAi.assignObjectives env Tactics.formation442 assignObjectiveA Team.TeamA (fun () -> state.Value)
+        |> scheduler.AddTask
+
+        task {
+            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ())
+            return ()
+        }
         |> scheduler.AddTask
 
     override this.LoadContent() =

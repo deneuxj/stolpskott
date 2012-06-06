@@ -36,9 +36,9 @@ let (|SomeImpulse|_|) =
     | Trapped _ -> Some TypedVector3<m/s>.Zero
     | Free -> None
 
-let controlMaxDistance = 0.5f<m> // Beyond this distance, balls don't collide with players.
+let controlMaxDistance = 0.5f<m> // Beyond this distance, players can't trap the ball
 let kickMaxDistance = 0.8f<m> // Distance from the ball within which a player can kick it.
-let pushedDistance = 0.3f<m>
+let pushedDistance = 0.3f<m> // Distance before the ball is pushed by a player.
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls

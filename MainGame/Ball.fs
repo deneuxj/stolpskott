@@ -7,25 +7,27 @@ open Team
 
 type PitchSide = Left | Right
 
+type Engagement = CanKick | WaitWhistle
+
 type InPlay =
     | InPlay
-    | CornerKick of TeamSide * PitchSide
+    | CornerKick of Engagement * TeamSide * PitchSide
     | KickIn of TeamSide * PitchSide
-    | KickOff of TeamSide
+    | KickOff of Engagement * TeamSide
     | ThrowIn of TeamSide * PitchSide * float32<m>
-    | Penalty of TeamSide
+    | Penalty of Engagement * TeamSide
     | FreeKick of TeamSide * TypedVector2<m>
     | TrappedByKeeper of TeamSide
 
 let (|DeadBall|LiveBall|) = function
     | InPlay -> LiveBall
     | KickIn (team, _)
-    | KickOff (team)
+    | KickOff (_, team)
     | ThrowIn (team, _, _)
-    | Penalty (team)
+    | Penalty (_, team)
     | FreeKick (team, _)
     | TrappedByKeeper team
-    | CornerKick (team, _) -> DeadBall (Some team)
+    | CornerKick (_, team, _) -> DeadBall (Some team)
 
 type State =
     { pos : TypedVector3<m>

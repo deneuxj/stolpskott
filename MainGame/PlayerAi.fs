@@ -26,7 +26,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     let getRelPos pos = Tactics.getRelPos (getMatchState().pitch) (attackUp()) pos
     let getAbsPos pos = Tactics.getAbsPos (getMatchState().pitch) (attackUp()) pos
     let getAbsDir dir = Tactics.getAbsDir (attackUp()) dir
-    let absUp = TypedVector2<1>(0.0f, 1.0f) |> getAbsDir
+    let absUp() = TypedVector2<1>(0.0f, 1.0f) |> getAbsDir
 
     let waitUntilBallInPlay =
         task {
@@ -40,7 +40,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     let prepareForKickOff =
         task {
             // Goal keeper goes to the goal
-            (getAbsPos { x = 0.0f ; y = -1.0f }, absUp) |> RunningTo |> assign 0
+            (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()) |> RunningTo |> assign 0
 
             // Field players place themselves according to the formation            
             let destinations =
@@ -55,13 +55,13 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                         9.15f<m> * v
                     else
                         v)
-                |> List.map (fun dest -> (dest, getAbsDir absUp))
+                |> List.map (fun dest -> (dest, absUp()))
                 |> Array.ofList
 
             // If the ball is ours, the two players closest to the ball go to it
             let ballIsOurs =
                 match getMatchState().ball.inPlay with
-                | Ball.KickOff owner when owner = side -> true
+                | Ball.KickOff(_, owner) when owner = side -> true
                 | _ -> false
 
             if ballIsOurs then
@@ -82,8 +82,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     player1 < 0 || player1 >= destinations.Length then
                     failwith "Could not find two players to kick off the ball"
 
-                destinations.[player0] <- TypedVector2<m>(-2.0f<m>, 0.0f<m>), absUp
-                destinations.[player1] <- TypedVector2<m>(2.0f<m>, 0.0f<m>), absUp
+                destinations.[player0] <- TypedVector2<m>(-2.0f<m>, 0.0f<m>), absUp()
+                destinations.[player1] <- TypedVector2<m>(2.0f<m>, 0.0f<m>), absUp()
             
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)
