@@ -140,47 +140,69 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendCorner =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
     let kickCorner =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
-    let defendThrowIn =
+    let moveToFormation =
         task {
-            return ()
+            let formation =
+                Tactics.tactics Tactics.formation442 side (getMatchState())
+                |> List.map getAbsPos
+                |> Array.ofList
+
+            formation
+            |> Array.iteri (fun i v -> RunningTo (v, absUp()) |> assign (i+1))
+
+            do! env.WaitNextFrame()
+
+            do! env.WaitUntil <|
+                fun () ->
+                    getTeam().onPitch
+                    |> Array.exists (function { activity = Player.Standing ; speed = 0.0f<m/s> } -> false | _ -> true)
+                    |> not
+
+            formation
+            |> Array.iteri (fun i v -> FollowingTactic |> assign (i+1))
         }
 
-    let throwIn =
+    let defendThrowIn pitchSide y =
         task {
-            return ()
+            return! moveToFormation
+        }
+
+    let throwIn pitchSide y =
+        task {
+            return! moveToFormation
         }
 
     let defendFreeKick =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
     let freeKick =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
     let defendPenalty =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
     let kickPenalty =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
     let celebrate =
         task {
-            return ()
+            return! env.WaitNextFrame()
         }
 
     let matchIsOver() =
@@ -195,6 +217,11 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             | { ball = { inPlay = Ball.KickOff _ } } ->
                 do! prepareForKickOff
                 return! main()
+            | { ball = { inPlay = Ball.ThrowIn(owner, pitchSide, y) } } ->
+                if owner = side then
+                    do! throwIn pitchSide y
+                else
+                    do! defendThrowIn pitchSide y
             | _ ->
                 do! normalPlay
                 return! main()
