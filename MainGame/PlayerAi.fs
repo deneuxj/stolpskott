@@ -77,6 +77,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 | _ -> false
 
             if ballIsOurs then
+                // Pick two players to do the kick-off.
+                // The first kicks the ball, the second catches it.
                 let _, ((player0, _), (player1, _)) =
                     destinations
                     |> Array.fold (fun (i, ((i0, d0), (i1, d1) as x)) (v, _) ->
@@ -102,8 +104,10 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
                 do! waitUntilBallEngaged
 
+                // Order the first player to pass the ball to the second.
                 PassingTo player1 |> assign player0
 
+                // Wait until the first player has passed the ball.
                 do! waitUntilBallInPlay
                 do! env.WaitUntil <|
                     fun () ->
@@ -116,12 +120,17 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                         else
                             true
                 
+                // Stop the first player from passing the ball.
                 FollowingTactic |> assign player0
             else
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)
 
                 do! waitUntilBallInPlay
+
+                // All players follow the tactic.
+                destinations
+                |> Array.iteri(fun i _ -> FollowingTactic |> assign i)
         }
 
     let normalPlay =

@@ -271,6 +271,8 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                 match getMatchState().ball.inPlay, state.ball.inPlay with
                 | Ball.LiveBall, Ball.DeadBall _ ->
                     printfn "DEAD BALL"
+                | Ball.DeadBall _, Ball.LiveBall ->
+                    printfn "LIVE BALL"
                 | _ -> ()
                 let state = { state with periodTime = 1.0f<s> * watch.ElapsedSeconds }
                 let inPlay =
@@ -283,7 +285,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                         | Ball.Penalty(_, side) -> Ball.Penalty(Ball.CanKick, side)
                         | _ -> state.ball.inPlay
                     elif !makeBallLive then
-                        printfn "BALL NOW ALIVE!"
+                        makeBallLive := false
                         Ball.InPlay
                     else
                         state.ball.inPlay

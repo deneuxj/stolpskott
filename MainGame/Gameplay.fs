@@ -107,6 +107,9 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
         }
         |> scheduler.AddTask
 
+        Director.directorTask env (fun () -> state.Value) (fun ballState -> state := { state.Value with ball = ballState })
+        |> scheduler.AddTask
+
     override this.LoadContent() =
         textures :=
             Some {
