@@ -17,7 +17,7 @@ type AiPlayerObjective =
 
 
 let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) =
-    let team  =
+    let getTeam() =
         match side with
         | Team.TeamA -> getMatchState().teamA
         | Team.TeamB -> getMatchState().teamB
@@ -105,6 +105,18 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 PassingTo player1 |> assign player0
 
                 do! waitUntilBallInPlay
+                do! env.WaitUntil <|
+                    fun () ->
+                        let team = getTeam()
+                        if player0 > 0 && player0 < team.onPitch.Length then
+                            let player0 = team.onPitch.[player0]
+                            match player0 with
+                            | { activity = Player.Passing } -> true
+                            | _ -> false
+                        else
+                            true
+                
+                FollowingTactic |> assign player0
             else
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)
