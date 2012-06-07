@@ -142,7 +142,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             |> Array.map (Player.updateKeyFrame dt >> Player.updatePlayer dt)
             |> Array.mapi (fun i playerState ->
                 match teamAObjectives.Value.TryFind i with
-                | Some objective -> PlayerAi.actPlayerOnObjective Team.TeamA state.Value.ball objective playerState
+                | Some objective -> PlayerAi.actPlayerOnObjective Team.TeamA state.Value objective playerState
                 | None -> playerState)
 
         let allPlayers =
@@ -151,9 +151,9 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
 
         let ballState, impulse =
             match state.Value.ball.inPlay with
-            | Ball.LiveBall -> 
+            | Ball.PhysicsControlled -> 
                 Physics.updateBall goalCenters dt allPlayers state.Value.ball
-            | Ball.DeadBall _ ->
+            | Ball.Constrained ->
                 state.Value.ball, Physics.Free
 
         let ballState =

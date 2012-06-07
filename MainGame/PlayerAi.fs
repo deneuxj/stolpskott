@@ -37,6 +37,18 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     | _ -> false
         }
 
+    let waitUntilBallEngaged =
+        task {
+            return! env.WaitUntil <|
+                fun () ->
+                    match getMatchState().ball.inPlay with
+                    | Ball.CornerKick(Ball.CanKick, _, _)
+                    | Ball.KickOff(Ball.CanKick, _)
+                    | Ball.Penalty(Ball.CanKick, _) ->
+                        true
+                    | _ -> false
+        }
+
     let prepareForKickOff =
         task {
             // Goal keeper goes to the goal
@@ -88,19 +100,21 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)
 
-                do! waitUntilBallInPlay
+                do! waitUntilBallEngaged
 
                 PassingTo player1 |> assign player0
+
+                do! waitUntilBallInPlay
             else
                 destinations
                 |> Array.iteri(fun i v -> RunningTo v |> assign i)
 
-                do! waitUntilBallInPlay                                        
+                do! waitUntilBallInPlay
         }
 
     let normalPlay =
-        task {
-            return ()
+        task {            
+            return! env.WaitNextFrame()
         }
 
     let defendCorner =
@@ -168,7 +182,18 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     main()
 
 
-let actPlayerOnObjective side (ball : Ball.State) objective (playerState : Player.State) =
+let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerState : Player.State) =
+    let ball = matchState.ball
+    let team =
+        match side with
+        | Team.TeamA -> matchState.teamA.onPitch
+        | Team.TeamB -> matchState.teamB.onPitch
+
+    let ballPos2 = TypedVector2<m>(ball.pos.X, ball.pos.Y)
+    let distToBall pos =
+        pos - ballPos2
+        |> TypedVector.len2
+
     let runToPos destination =
         let dir = destination - playerState.pos
         let dist = dir.Length
@@ -192,7 +217,27 @@ let actPlayerOnObjective side (ball : Ball.State) objective (playerState : Playe
         | { speed = 0.0f<m/s> } -> { newState with direction = dir }
         | _ -> newState
     | RunningToBall, _ ->
-        runToPos (TypedVector2<m>(ball.pos.X, ball.pos.Y))
+        runToPos ballPos2
+    | PassingTo other, Player.Standing ->
+        match distToBall playerState.pos with
+        | x when x < Physics.controlMaxDistance ->
+            { playerState with activity = Player.Trapping }
+        | _ ->
+            runToPos ballPos2
+    | PassingTo other, Player.Trapping ->
+        let dir =
+            if other >= 0 && other < team.Length then
+                team.[other].pos - playerState.pos
+                |> TypedVector.tryNormalize2
+            else None
+
+        match dir with
+        | None ->
+            { playerState with activity = Player.Passing }
+        | Some d ->
+            { playerState with direction = d ; activity = Player.Passing }
+    | _, Player.Passing ->
+        { playerState with activity = Player.Standing }
     | _, _ ->
         playerState
 
