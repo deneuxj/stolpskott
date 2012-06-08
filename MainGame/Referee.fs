@@ -8,7 +8,7 @@ open Match
 
 let wallDistance = 9.15f<m>
 
-let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) =
+let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) (kickerReady : unit -> bool) =
     let watch = env.NewStopwatch()
     let scoreA = ref 0
     let scoreB = ref 0
@@ -229,22 +229,14 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                         | Ball.DeadBall _ -> true
                         | _ -> false
 
-                // Wait for the ball to lay still at the kick position
+                do! env.WaitUntil kickerReady
+
+                // Wait for the ball to lay still
                 do! env.WaitUntil <|
-                    fun () ->
+                    fun() ->
                         !killed
                         ||
-                        match getMatchState().ball with
-                        | { inPlay = Ball.CornerKick(Ball.CanKick, _, _) ; speed = speed }
-                        | { inPlay = Ball.KickIn(_, _) ; speed = speed }
-                        | { inPlay = Ball.KickOff(Ball.CanKick, _) ; speed = speed }
-                        | { inPlay = Ball.Penalty(Ball.CanKick, _) ; speed = speed }
-                            when speed = TypedVector3<m/s>.Zero ->
-                            true
-                        | { inPlay = Ball.FreeKick(_, kickPos) ; speed = speed ; pos = pos }
-                            when speed = TypedVector3<m/s>.Zero && pos.X = kickPos.X && pos.Y = kickPos.Y ->
-                            true
-                        | _ -> false
+                        getMatchState().ball.speed = TypedVector3<m/s>.Zero
 
                 // Wait for the ball to move
                 do! env.WaitUntil <|

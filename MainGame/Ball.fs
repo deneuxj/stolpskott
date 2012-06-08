@@ -29,6 +29,7 @@ let (|DeadBall|LiveBall|) = function
     | TrappedByKeeper team
     | CornerKick (_, team, _) -> DeadBall (Some team)
 
+(*
 let (|Constrained|PhysicsControlled|) = function
     | CornerKick (CanKick, _, _)
     | Penalty (CanKick, _)
@@ -41,6 +42,7 @@ let (|Constrained|PhysicsControlled|) = function
     | ThrowIn _
     | FreeKick _
     | TrappedByKeeper _ -> Constrained
+*)
 
 type State =
     { pos : TypedVector3<m>

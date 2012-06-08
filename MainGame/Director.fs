@@ -7,7 +7,7 @@ open CleverRake.XnaUtils.Units
 open Match
 
 // Directs the ball when it's not in play.
-let directorTask (env : Environment) (getMatchState : unit -> MatchState) (setBallState : Ball.State -> unit) =
+let directorTask (env : Environment) (getMatchState : unit -> MatchState) (setBallState : Ball.State -> unit) (toggleBallPhysics : bool -> unit) (kickerReady : unit -> bool) (resetKickerReady : unit -> unit) =
     task {
         while getMatchState().period <> MatchOver do
             // Wait until the ball becomes dead
@@ -19,6 +19,8 @@ let directorTask (env : Environment) (getMatchState : unit -> MatchState) (setBa
 
             // Let the ball bounce around for a second
             do! env.Wait 1.0f
+
+            toggleBallPhysics false
 
             // Move the ball to where it's supposed to be
             let newPos =
@@ -85,6 +87,13 @@ let directorTask (env : Environment) (getMatchState : unit -> MatchState) (setBa
                     failwith "Ball shouldn't be in play"
 
             setBallState { getMatchState().ball with pos = newPos ; speed = TypedVector3<m/s>.Zero }
+
+            // Wait until the kicker is ready
+            do! env.WaitUntil kickerReady
+            toggleBallPhysics true
+
+            do! env.WaitNextFrame()
+            resetKickerReady()
 
             // Wait for the ball to be live again
             do! env.WaitUntil <|

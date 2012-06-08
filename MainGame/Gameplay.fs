@@ -76,6 +76,9 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
         teamAObjectives :=
             Map.add idx objective teamAObjectives.Value
 
+    let ballPhysicsEnabled = ref false
+    let kickerReady = ref false
+
     let mutable prePad = Input.GamePad.GetState(playerIndex)
     let scheduler = new Scheduler()
     let env = new Environment(scheduler)
@@ -98,16 +101,28 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
     override this.Initialize() =
         base.Initialize()
 
-        PlayerAi.assignObjectives env Tactics.formation442 assignObjectiveA Team.TeamA (fun () -> state.Value)
+        PlayerAi.assignObjectives
+            env
+            Tactics.formation442
+            assignObjectiveA
+            Team.TeamA
+            (fun () -> state.Value)
+            (fun () -> kickerReady := true)
         |> scheduler.AddTask
 
         task {
-            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ())
+            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ()) (fun () -> kickerReady.Value)
             return ()
         }
         |> scheduler.AddTask
 
-        Director.directorTask env (fun () -> state.Value) (fun ballState -> state := { state.Value with ball = ballState })
+        Director.directorTask
+            env
+            (fun () -> state.Value)
+            (fun ballState -> state := { state.Value with ball = ballState })
+            (fun t -> ballPhysicsEnabled := t)
+            (fun () -> kickerReady.Value)
+            (fun () -> kickerReady := false)
         |> scheduler.AddTask
 
     override this.LoadContent() =
@@ -153,10 +168,9 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             |> Array.mapi (fun i playerState -> (Team.TeamA, i), playerState)
 
         let ballState, impulse =
-            match state.Value.ball.inPlay with
-            | Ball.PhysicsControlled -> 
+            if ballPhysicsEnabled.Value then
                 Physics.updateBall goalCenters dt allPlayers state.Value.ball
-            | Ball.Constrained ->
+            else
                 state.Value.ball, Physics.Free
 
         let ballState =

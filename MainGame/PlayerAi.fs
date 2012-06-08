@@ -16,7 +16,7 @@ type AiPlayerObjective =
     | ShootingAtGoal
 
 
-let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) =
+let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) (setKickerReady : unit -> unit) =
     let getTeam() =
         match side with
         | Team.TeamA -> getMatchState().teamA
@@ -49,6 +49,23 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     | _ -> false
         }
 
+    let pickTwoClosest target positions =
+        let far = 1.0f<m> * System.Single.PositiveInfinity
+        let _, ((player0, _), (player1, _)) =
+            positions
+            |> Array.fold (fun (i, ((i0, d0), (i1, d1) as x)) v ->
+                let d = target - v |> TypedVector.len2
+                let matches =
+                    if d < d0 then
+                        ((i, d), (i0, d0))
+                    elif d < d1 then
+                        ((i0, d0), (i, d))
+                    else
+                        x
+                (i + 1, matches)) (0, ((-1, far), (-1, far)))
+
+        (player0, player1)
+                
     let prepareForKickOff =
         task {
             // Goal keeper goes to the goal
@@ -79,18 +96,10 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             if ballIsOurs then
                 // Pick two players to do the kick-off.
                 // The first kicks the ball, the second catches it.
-                let _, ((player0, _), (player1, _)) =
+                let player0, player1 =
                     destinations
-                    |> Array.fold (fun (i, ((i0, d0), (i1, d1) as x)) (v, _) ->
-                        let d = v.Length
-                        let matches =
-                            if d < d0 then
-                                ((i, d), (i0, d0))
-                            elif d < d1 then
-                                ((i0, d0), (i, d))
-                            else
-                                x
-                        (i + 1, matches)) (0, ((-1, 1000.0f<m>), (-1, 1000.0f<m>)))
+                    |> Array.map fst
+                    |> pickTwoClosest (TypedVector2<m>.Zero)
                  
                 if player0 < 0 || player0 >= destinations.Length ||
                     player1 < 0 || player1 >= destinations.Length then
@@ -100,18 +109,20 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 destinations.[player1] <- TypedVector2<m>(2.0f<m>, 0.0f<m>), absUp()
             
                 destinations
-                |> Array.iteri(fun i v -> RunningTo v |> assign i)
+                |> Array.iteri(fun i v -> RunningTo v |> assign (i + 1))
 
                 do! waitUntilBallEngaged
+                setKickerReady()
 
                 // Order the first player to pass the ball to the second.
-                PassingTo player1 |> assign player0
+                PassingTo (player1 + 1) |> assign (player0 + 1)
 
                 // Wait until the first player has passed the ball.
                 do! waitUntilBallInPlay
                 do! env.WaitUntil <|
                     fun () ->
                         let team = getTeam()
+                        let player0 = player0 + 1 // Index in destinations -> Index in players (goalie not included in destinations)
                         if player0 > 0 && player0 < team.onPitch.Length then
                             let player0 = team.onPitch.[player0]
                             match player0 with
@@ -120,16 +131,17 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                         else
                             true
                 
-                // Stop the first player from passing the ball.
-                FollowingTactic |> assign player0
+                // All players follow the tactic.
+                getTeam().onPitch
+                |> Array.iteri(fun i _ -> FollowingTactic |> assign i)
             else
                 destinations
-                |> Array.iteri(fun i v -> RunningTo v |> assign i)
+                |> Array.iteri(fun i v -> RunningTo v |> assign (i + 1))
 
                 do! waitUntilBallInPlay
 
                 // All players follow the tactic.
-                destinations
+                getTeam().onPitch
                 |> Array.iteri(fun i _ -> FollowingTactic |> assign i)
         }
 
@@ -177,7 +189,59 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let throwIn pitchSide y =
         task {
-            return! moveToFormation
+            do! moveToFormation
+
+            // Find the players closest to the throw-in position
+            let x =
+                let pitch = getMatchState().pitch
+                match pitchSide with
+                | Ball.Left -> -pitch.width / 2.0f
+                | Ball.Right -> pitch.width / 2.0f
+
+            let pos = TypedVector2<m>(x, y)
+
+            let team = getTeam()
+            let thrower, receiver =
+                team.onPitch
+                |> Array.map (function { pos = v } -> v)
+                |> pickTwoClosest pos
+
+            // Order to move into position to throw and receive the ball
+            if thrower > 0 && receiver > 0 then
+                RunningTo(pos, absUp()) |> assign thrower
+                let xReceiver =
+                    match pitchSide with
+                    | Ball.Left -> x + 3.0f<m>
+                    | Ball.Right -> x - 3.0f<m>
+                RunningTo(TypedVector2<m>(xReceiver, y), absUp()) |> assign receiver
+            else
+                failwith "No player available to throw the ball in"
+
+            // Wait until they are in position
+            do! env.WaitNextFrame()
+            do! env.WaitUntil <|
+                fun () ->
+                    let team = getTeam()
+                    let thrower, receiver = team.onPitch.[thrower], team.onPitch.[receiver]
+                    thrower.speed = 0.0f<m/s> && receiver.speed = 0.0f<m/s>
+
+            // Do the throw in
+            setKickerReady()
+            do! env.WaitNextFrame()
+            PassingTo receiver |> assign thrower
+            do! env.WaitNextFrame()
+
+            // Wait until the throw is completed
+            do! env.WaitUntil <|
+                fun () ->
+                    let team = getTeam()
+                    let thrower = team.onPitch.[thrower]
+                    match thrower.activity with
+                    | Player.Passing -> true
+                    | _ -> false
+
+            // The thrower is done
+            FollowingTactic |> assign thrower
         }
 
     let defendFreeKick =
