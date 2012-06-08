@@ -8,7 +8,7 @@ open Match
 
 let wallDistance = 9.15f<m>
 
-let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) (kickerReady : unit -> bool) =
+let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) (kickerReady : IEvent<_>) =
     let watch = env.NewStopwatch()
     let scoreA = ref 0
     let scoreB = ref 0
@@ -131,7 +131,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
             | Other ->
                 state
 
-    let engagementWhistle = ref false
+    let engagementWhistle = env.NewChannel()
     let engagement killed =
         task {
             while not !killed do
@@ -212,11 +212,18 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                 
                 // Blow the whistle.
                 if not <| !killed then
-                    engagementWhistle := true
-                    do! env.WaitUntil (fun () -> not !engagementWhistle)
+                    do! engagementWhistle.Send()
+
+                // Wait for a live ball.
+                if not <| !killed then
+                    do! env.WaitUntil <|
+                        fun () ->
+                            match getMatchState().ball.inPlay with
+                            | Ball.LiveBall _ -> true
+                            | _ -> false
         }
 
-    let makeBallLive = ref false
+    let makeBallLive = env.NewChannel()
     let switchToLiveBall killed =
         task {
             while not !killed do
@@ -229,7 +236,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                         | Ball.DeadBall _ -> true
                         | _ -> false
 
-                do! env.WaitUntil kickerReady
+                do! env.AwaitEvent kickerReady
 
                 // Wait for the ball to lay still
                 do! env.WaitUntil <|
@@ -247,8 +254,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
 
                 // The ball is now alive
                 if not <| !killed then
-                    makeBallLive := true
-                    do! env.WaitUntil(fun () -> not !makeBallLive)
+                    do! makeBallLive.Send()
         }
 
     let rec main toucher killed =
@@ -263,24 +269,26 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                 match getMatchState().ball.inPlay, state.ball.inPlay with
                 | Ball.LiveBall, Ball.DeadBall _ ->
                     printfn "DEAD BALL"
-                | Ball.DeadBall _, Ball.LiveBall ->
-                    printfn "LIVE BALL"
                 | _ -> ()
                 let state = { state with periodTime = 1.0f<s> * watch.ElapsedSeconds }
-                let inPlay =
-                    if !engagementWhistle then
-                        engagementWhistle := false
-                        printfn "WHISTLE!"
-                        match state.ball.inPlay with
-                        | Ball.CornerKick(_, teamSide, pitchSide) -> Ball.CornerKick(Ball.CanKick, teamSide, pitchSide)
-                        | Ball.KickOff(_, side) -> Ball.KickOff(Ball.CanKick, side)
-                        | Ball.Penalty(_, side) -> Ball.Penalty(Ball.CanKick, side)
-                        | _ -> state.ball.inPlay
-                    elif !makeBallLive then
-                        makeBallLive := false
-                        Ball.InPlay
-                    else
-                        state.ball.inPlay
+                let! inPlay =
+                    task {
+                        if not <| engagementWhistle.IsEmpty() then
+                            let! _ = engagementWhistle.Receive()
+                            printfn "WHISTLE!"
+                            return
+                                match state.ball.inPlay with
+                                | Ball.CornerKick(_, teamSide, pitchSide) -> Ball.CornerKick(Ball.CanKick, teamSide, pitchSide)
+                                | Ball.KickOff(_, side) -> Ball.KickOff(Ball.CanKick, side)
+                                | Ball.Penalty(_, side) -> Ball.Penalty(Ball.CanKick, side)
+                                | _ -> state.ball.inPlay
+                        elif not <| makeBallLive.IsEmpty() then
+                            let! _ = makeBallLive.Receive()
+                            printfn "BALL LIVE"
+                            return Ball.InPlay
+                        else
+                            return state.ball.inPlay
+                    }
                 let state = { state with ball = { state.ball with inPlay = inPlay } }
                 setMatchState(state)
                 do! env.WaitNextFrame()

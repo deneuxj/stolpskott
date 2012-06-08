@@ -77,7 +77,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             Map.add idx objective teamAObjectives.Value
 
     let ballPhysicsEnabled = ref false
-    let kickerReady = ref false
+    let kickerReady = new Event<_>()
 
     let mutable prePad = Input.GamePad.GetState(playerIndex)
     let scheduler = new Scheduler()
@@ -107,11 +107,11 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             assignObjectiveA
             Team.TeamA
             (fun () -> state.Value)
-            (fun () -> kickerReady := true)
+            kickerReady
         |> scheduler.AddTask
 
         task {
-            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ()) (fun () -> kickerReady.Value)
+            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ()) kickerReady.Publish
             return ()
         }
         |> scheduler.AddTask
@@ -121,8 +121,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             (fun () -> state.Value)
             (fun ballState -> state := { state.Value with ball = ballState })
             (fun t -> ballPhysicsEnabled := t)
-            (fun () -> kickerReady.Value)
-            (fun () -> kickerReady := false)
+            kickerReady.Publish
         |> scheduler.AddTask
 
     override this.LoadContent() =

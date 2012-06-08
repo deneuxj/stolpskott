@@ -16,7 +16,7 @@ type AiPlayerObjective =
     | ShootingAtGoal
 
 
-let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) (setKickerReady : unit -> unit) =
+let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) (kickerReady : Event<_>) =
     let getTeam() =
         match side with
         | Team.TeamA -> getMatchState().teamA
@@ -112,7 +112,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 |> Array.iteri(fun i v -> RunningTo v |> assign (i + 1))
 
                 do! waitUntilBallEngaged
-                setKickerReady()
+                kickerReady.Trigger()
 
                 // Order the first player to pass the ball to the second.
                 PassingTo (player1 + 1) |> assign (player0 + 1)
@@ -226,7 +226,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     thrower.speed = 0.0f<m/s> && receiver.speed = 0.0f<m/s>
 
             // Do the throw in
-            setKickerReady()
+            kickerReady.Trigger()
             do! env.WaitNextFrame()
             PassingTo receiver |> assign thrower
             do! env.WaitNextFrame()
