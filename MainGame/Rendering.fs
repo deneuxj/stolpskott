@@ -126,17 +126,19 @@ let renderLines
 
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     let lineHalfWidth = 0.5f * 0.14f<m>
+    let brightness = 0.6f
+    let color = new Color(brightness, brightness, brightness, 0.7f)
     let drawHLine (x0, y0) (x1) =
         let x0, x1 = min x0 x1, max x0 x1
         let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
         let x1', y1' = worldToScreen (x1 + lineHalfWidth, y0 + lineHalfWidth)
-        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), Color.White)
+        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), color)
 
     let drawVLine (x0, y0) (y1) =
         let y0, y1 = min y0 y1, max y0 y1
         let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
         let x1', y1' = worldToScreen (x0 + lineHalfWidth, y1 + lineHalfWidth)
-        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), Color.White)
+        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), color)
 
     // Outer lines, middle line.
     let x0 = -pitch.width / 2.0f
@@ -219,9 +221,12 @@ let getFrame frames (kf : float32<kf>) =
         |> max 0
     frames.[idx]
 
-let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper goalLower (pitch : Pitch.PitchTraits) (viewX, viewY) sprites =
+let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper (goalLower : Texture2D) (pitch : Pitch.PitchTraits) (viewX, viewY) sprites =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
+    // Vertical displacement due to the slightly tipped view angle
+    let elevation = 1.0f<px> * (float32 <| goalLower.Height / 2) / Physics.goalHeight
+
     for s in sprites do
         match s with
         | Ball b ->
@@ -231,7 +236,7 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let y = b.pos.Y + scaledRadius
             let x, y = worldToScreen (x, y)
             let w = 2.0f * scaledRadius * ratio |> int
-            sb.Draw(ball, Rectangle(int x, int y, w, w), Color.White)
+            sb.Draw(ball, Rectangle(int x, int (y - elevation * b.pos.Z), w, w), Color.White)
 
         | Player(player, side) ->
             let x = player.pos.X
@@ -254,7 +259,12 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let dx = player.direction.X |> discretizeTrigo
             let dy = player.direction.Y |> discretizeTrigo
             let angle = atan2 dx dy
-            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), Color.White, angle, Vector2(16.0f, 16.0f), SpriteEffects.None, 0.0f)
+            let color =
+                match player, side with
+                | { isKeeper = true }, _ -> Color.Green
+                | { isKeeper = false }, Team.TeamA -> Color.White
+                | { isKeeper = false }, Team.TeamB -> Color.Red
+            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), color, angle, Vector2(16.0f, 16.0f), SpriteEffects.None, 0.0f)
 
         | GoalUpper ->
             let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
@@ -264,7 +274,19 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
+let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, viewY) (ballPos : TypedVector3<m>) =
+    let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
+    
+    let x = ballPos.X - Ball.ballRadius
+    let y = ballPos.Y + Ball.ballRadius
+    let x, y = worldToScreen (x, y)
+    let w = 2.0f * Ball.ballRadius * ratio |> int
 
+    let color = new Color(0.1f, 0.1f, 0.1f, 0.1f)
+
+    sb.Draw(shadow, Rectangle(int x, int y, w, w), color)
+
+    
 let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, allPlayers, ballState : Ball.State, (x, y)) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
@@ -273,9 +295,10 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
     
     //let x, y = ballState.pos.X, ballState.pos.Y
 
-    sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend)
+    sb.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
+        renderBallShadow sb viewSize ball (x, y) ballState.pos
         renderLines sb viewSize line pitch (x, y)
         let sprites =
             [| yield GoalUpper
