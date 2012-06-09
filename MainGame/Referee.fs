@@ -35,8 +35,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
 
     let whoTouchedTheBallLast state player =
         match state with
-        | { ball = { inPlay = Ball.DeadBall _ } } -> player
-        | { ball = { inPlay = Ball.LiveBall } ; teamA = teamA ; teamB = teamB } ->
+        | { teamA = teamA ; teamB = teamB } ->
             let touched (team : Team.TeamSide) players =
                 players
                 |> Array.tryFind (fun player ->
@@ -46,7 +45,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
             match touched Team.TeamA teamA.onPitch with
             | None ->
                 match touched Team.TeamB teamB.onPitch with
-                | None -> None
+                | None -> player
                 | Some player -> Some(Team.TeamB, player)
             | Some player ->
                 Some(Team.TeamA, player)
