@@ -93,10 +93,13 @@ let tactics formation side (game : Match.MatchState) =
                     match side with
                     | Team.TeamA -> game.teamB
                     | Team.TeamB -> game.teamA
-                opponents.onPitch
-                |> Seq.map (fun player -> player.pos |> getRelPos)
-                |> Seq.map (fun { y = y } -> y )
-                |> Seq.max
+                if Array.isEmpty opponents.onPitch then
+                    1.0f
+                else
+                    opponents.onPitch
+                    |> Seq.map (fun player -> player.pos |> getRelPos)
+                    |> Seq.map (fun { y = y } -> y )
+                    |> Seq.max
             (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
 
         // Trapped by own keeper

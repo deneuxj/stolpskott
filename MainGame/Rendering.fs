@@ -126,8 +126,8 @@ let renderLines
 
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     let lineHalfWidth = 0.5f * 0.14f<m>
-    let brightness = 0.6f
-    let color = new Color(brightness, brightness, brightness, 0.7f)
+    let brightness = 0.9f
+    let color = new Color(brightness, brightness, brightness, 0.5f)
     let drawHLine (x0, y0) (x1) =
         let x0, x1 = min x0 x1, max x0 x1
         let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
@@ -274,6 +274,7 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
             sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
+
 let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, viewY) (ballPos : TypedVector3<m>) =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
@@ -282,7 +283,7 @@ let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, v
     let x, y = worldToScreen (x, y)
     let w = 2.0f * Ball.ballRadius * ratio |> int
 
-    let color = new Color(0.1f, 0.1f, 0.1f, 0.1f)
+    let color = new Color(0.1f, 0.1f, 0.1f, 0.9f)
 
     sb.Draw(shadow, Rectangle(int x, int y, w, w), color)
 
@@ -298,8 +299,8 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
     sb.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
-        renderBallShadow sb viewSize ball (x, y) ballState.pos
         renderLines sb viewSize line pitch (x, y)
+        renderBallShadow sb viewSize ball (x, y) ballState.pos
         let sprites =
             [| yield GoalUpper
                yield GoalLower
