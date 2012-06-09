@@ -50,7 +50,7 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
                               length = 1.8f<m>
                               ballControl = 0.5f<bc>
                             }
-                          isKeeper = false
+                          isKeeper = (i = 1)
                           health = 1.0f<he>
                           condition = 1.0f<sta> }
                     |]
