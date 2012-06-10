@@ -12,7 +12,7 @@ type State =
       ball : Ball.State
     }
 
-type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
+type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
     inherit DrawableGameComponent(game)
 
     let textures : Rendering.Resources option ref = ref None
@@ -33,31 +33,33 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
            TypedVector2<m>(0.0f<m>, -pitch.length / 2.0f)
         |]
     let state : Match.MatchState ref =
+        let playerTraits : Player.Traits =
+            { speed = Player.maxRunSpeed
+              stamina = 1.0f<sta>
+              strength = 1.0f<st>
+              length = 1.8f<m>
+              ballControl = 0.2f<bc>
+            }
+        let team : Player.State[] =
+            [| for i in 1..11 ->        
+                { pos = TypedVector2<m>(-50.0f<m>, -3.0f<m>)
+                  direction = TypedVector2<1>(0.0f, 1.0f)
+                  speed = 0.0f<m/s>
+                  travelled = 0.0f<m>
+                  runningFrame = 0
+                  activity = Player.Standing
+                  traits = playerTraits
+                  isKeeper = (i = 1)
+                  health = 1.0f<he>
+                  condition = 1.0f<sta> }
+            |]
         ref {
             teamA =
-                { onPitch =
-                    [| for i in 1..11 ->        
-                        { pos = TypedVector2<m>(-50.0f<m>, -3.0f<m>)
-                          direction = TypedVector2<1>(0.0f, 1.0f)
-                          speed = 0.0f<m/s>
-                          travelled = 0.0f<m>
-                          runningFrame = 0
-                          activity = Player.Standing
-                          traits =
-                            { speed = Player.maxRunSpeed
-                              stamina = 1.0f<sta>
-                              strength = 1.0f<st>
-                              length = 1.8f<m>
-                              ballControl = 0.2f<bc>
-                            }
-                          isKeeper = (i = 1)
-                          health = 1.0f<he>
-                          condition = 1.0f<sta> }
-                    |]
+                { onPitch = team
                   substitutes = []
                 }
             teamB =
-                { onPitch = [||]
+                { onPitch = team
                   substitutes = [] }
             pitch = pitch
             period = Match.FirstHalf
@@ -75,6 +77,13 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
     let assignObjectiveA idx objective =
         teamAObjectives :=
             Map.add idx objective teamAObjectives.Value
+
+    let teamBObjectives =
+        ref Map.empty
+
+    let assignObjectiveB idx objective =
+        teamBObjectives :=
+            Map.add idx objective teamBObjectives.Value
 
     let ballPhysicsEnabled = ref false
     let kickerReady = new Event<_>()
@@ -106,6 +115,15 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
             Tactics.formation442
             assignObjectiveA
             Team.TeamA
+            (fun () -> state.Value)
+            kickerReady
+        |> scheduler.AddTask
+
+        PlayerAi.assignObjectives
+            env
+            Tactics.formation442
+            assignObjectiveB
+            Team.TeamB
             (fun () -> state.Value)
             kickerReady
         |> scheduler.AddTask
@@ -162,9 +180,23 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
                 | Some objective -> PlayerAi.actPlayerOnObjective Team.TeamA state.Value objective playerState
                 | None -> playerState)
 
-        let allPlayers =
+        let teamB =
+            state.Value.teamB.onPitch
+            |> Array.map (Player.updateKeyFrame dt >> Player.updatePlayer dt)
+            |> Array.mapi (fun i playerState ->
+                match teamBObjectives.Value.TryFind i with
+                | Some objective -> PlayerAi.actPlayerOnObjective Team.TeamB state.Value objective playerState
+                | None -> playerState)
+
+        let allPlayersA =
             teamA
             |> Array.mapi (fun i playerState -> (Team.TeamA, i), playerState)
+
+        let allPlayersB =
+            teamB
+            |> Array.mapi (fun i playerState -> (Team.TeamB, i), playerState)
+
+        let allPlayers = Array.append allPlayersA allPlayersB
 
         let ballState, impulse =
             if ballPhysicsEnabled.Value then
@@ -174,8 +206,13 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
 
         let ballState =
             match impulse with
-            | Physics.Trapped (Team.TeamA, idx) ->
-                let player = teamA.[idx]
+            | Physics.Trapped (side, idx) ->
+                let player =
+                    match side with
+                    | Team.TeamA ->
+                        teamA.[idx]
+                    | Team.TeamB ->
+                        teamB.[idx]
                 { ballState with pos = TypedVector3<m>(player.pos.X, player.pos.Y, Ball.ballRadius) }
             | _ -> ballState
             |> Pitch.boundBall pitch
@@ -187,13 +224,17 @@ type TrainingGameplay(game, content : Content.ContentManager, playerIndex) =
                 ballState
 
         prePad <- pad
-        state := { state.Value with teamA = { state.Value.teamA with onPitch = teamA } ; ball = ballState }
+        state := { state.Value with teamA = { state.Value.teamA with onPitch = teamA } ; teamB = { state.Value.teamB with onPitch = teamB } ; ball = ballState }
 
     override this.Draw(_) =
         match spriteBatch.Value, textures.Value with
         | Some spriteBatch, Some textures ->
-            let allPlayers =
+            let teamA =
                 state.Value.teamA.onPitch
                 |> Array.map (fun playerState -> (Team.TeamA, playerState))
+            let teamB =
+                state.Value.teamB.onPitch
+                |> Array.map (fun playerState -> (Team.TeamB, playerState))
+            let allPlayers = Array.append teamA teamB
             Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, state.Value.ball, (x, y))
         | _ -> ()

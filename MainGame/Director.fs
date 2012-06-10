@@ -48,9 +48,9 @@ let directorTask (env : Environment) (getMatchState : unit -> MatchState) (setBa
                         | Ball.Right -> Pitch.goalBoxWidth / 2.0f
                     let y =
                         if isTeamAttackingUp owner period then
-                            pitch.length / 2.0f - Pitch.goalBoxHeight
-                        else
                             -pitch.length / 2.0f + Pitch.goalBoxHeight
+                        else
+                            pitch.length / 2.0f - Pitch.goalBoxHeight
                     TypedVector3<m>(x, y, Ball.ballRadius)
 
                 | { ball = { inPlay = Ball.KickOff _ } } ->

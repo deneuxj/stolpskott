@@ -90,14 +90,14 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             // Field players place themselves according to the formation            
             let destinations =
                 formation
-                |> List.map (Tactics.transform 0.8f 0.25f 0.0f -0.25f)
+                |> List.map (Tactics.transform 0.8f 0.25f 0.0f -0.3f)
                 |> List.map getAbsPos
                 // Field players stand out of the circle.
                 |> List.map (fun v ->
                     let dist = v.Length
                     if dist < 9.15f<m> then
                         let v = 1.0f / dist * v
-                        9.15f<m> * v
+                        11.0f<m> * v
                     else
                         v)
                 |> List.map (fun dest -> (dest, absUp()))
@@ -295,8 +295,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                             RunningWithBallTo (player.pos + 10.0f<m> / distToGoal * towardsGoal)
                             |> assign closestToBall
                             do! env.Wait 1.0f
-                    else
-                        ()
+                | { ball = { inPlay = Ball.DeadBall _ } } -> ()
 
                 return! normalPlay
 
@@ -361,7 +360,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 |> pickTwoClosest pos
 
             // Order to move into position to throw and receive the ball
-            if thrower > 0 && receiver > 0 then
+            if thrower >= 0 && receiver >= 0 then
                 RunningTo(pos, absUp()) |> assign thrower
                 let xReceiver =
                     match pitchSide with
@@ -398,6 +397,39 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             FollowingTactic |> assign thrower
         }
 
+    let kickIn pitchSide =
+        task {
+            do! moveToFormation
+
+            let state = getMatchState()
+            let y =
+                if attackUp() then
+                    -state.pitch.length / 2.0f
+                else
+                    state.pitch.length / 2.0f
+            let x =
+                match pitchSide with
+                | Ball.Left -> -Pitch.goalBoxWidth / 2.0f
+                | Ball.Right -> Pitch.goalBoxWidth / 2.0f
+
+            let keeper = 0
+
+            RunningTo (TypedVector2<m>(x, y), absUp()) |> assign keeper
+            
+            do! env.WaitUntil <|
+                fun () ->
+                    getTeam().onPitch.[0].speed > 0.0f<m/s>
+            do! env.WaitUntil <|
+                fun () ->
+                    getTeam().onPitch.[0].speed = 0.0f<m/s>
+
+            ShootingAtGoal (TypedVector2<m>.Zero) |> assign keeper
+
+            return! waitKick 1.0f<s> keeper
+        }
+
+    let defendKickIn = moveToFormation
+        
     let defendFreeKick =
         task {
             return! env.WaitNextFrame()
@@ -440,6 +472,13 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     do! throwIn pitchSide y
                 else
                     do! defendThrowIn pitchSide y
+                return! main
+            | { ball = { inPlay = Ball.KickIn(owner, pitchSide) } } ->
+                if owner = side then
+                    do! kickIn pitchSide
+                else
+                    do! defendKickIn
+                return! main
             | { ball = { inPlay = Ball.LiveBall } } ->
                 do! normalPlay
                 return! main

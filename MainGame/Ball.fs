@@ -27,7 +27,7 @@ let (|DeadBall|LiveBall|) = function
     | Penalty (_, team)
     | FreeKick (team, _)
     | TrappedByKeeper team
-    | CornerKick (_, team, _) -> DeadBall (Some team)
+    | CornerKick (_, team, _) -> DeadBall team
 
 (*
 let (|Constrained|PhysicsControlled|) = function
