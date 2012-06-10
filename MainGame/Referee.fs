@@ -262,7 +262,19 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
             | Match.MatchOver -> return ()
             | _ ->
                 let state = getMatchState()
-                let toucher = whoTouchedTheBallLast state toucher
+                let toucher' = whoTouchedTheBallLast state toucher
+                match toucher, toucher' with
+                | None, Some t' ->
+                    printfn "NTouched: %A" (fst t')
+                | Some t, Some t' ->
+                    if fst t <> fst t' then
+                        printfn "Touched: %A" (fst t')
+                | Some _, None ->
+                    printfn "Touched: NONE?!"
+                | None, None ->
+                    ()
+                let toucher = toucher'
+
                 let state = manageMatchTime state
                 let state = switchToDeadBall state toucher
                 match getMatchState().ball.inPlay, state.ball.inPlay with

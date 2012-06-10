@@ -38,7 +38,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
               stamina = 1.0f<sta>
               strength = 1.0f<st>
               length = 1.8f<m>
-              ballControl = 0.2f<bc>
+              ballControl = 0.8f<bc>
             }
         let team : Player.State[] =
             [| for i in 1..11 ->        

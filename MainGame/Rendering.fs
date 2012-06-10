@@ -294,7 +294,7 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
         (viewWidth, viewHeight)
     
-    //let x, y = ballState.pos.X, ballState.pos.Y
+    let x, y = x + ballState.pos.X, y + ballState.pos.Y
 
     sb.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied)
     try
