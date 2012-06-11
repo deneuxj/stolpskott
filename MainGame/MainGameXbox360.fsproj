@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <AssemblyName>MainGame</AssemblyName>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Name>MainGame</Name>
+    <NoStdLib>true</NoStdLib>
+    <OutputType>Library</OutputType>
+    <Platform Condition=" '$(Platform)' == '' ">Xbox 360</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <ProjectGuid>{d166f804-2f90-4f87-b370-a16d069ac9a1}</ProjectGuid>
+    <RootNamespace>MainGame</RootNamespace>
+    <SchemaVersion>2.0</SchemaVersion>
+    <Tailcalls>false</Tailcalls>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <XnaFrameworkVersion>v4.0</XnaFrameworkVersion>
+    <XnaOututType>Library</XnaOututType>
+    <XnaPlatform>Xbox 360</XnaPlatform>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|Xbox 360'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <DefineConstants>DEBUG;TRACE;XBOX;XBOX360</DefineConstants>
+    <DocumentationFile>bin\Debug\MainGame.XML</DocumentationFile>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Xbox 360\Debug</OutputPath>
+    <PlatformTarget>x86</PlatformTarget>
+    <Tailcalls>false</Tailcalls>
+    <WarningLevel>3</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|Xbox 360'">
+    <DebugType>pdbonly</DebugType>
+    <DefineConstants>TRACE;XBOX;XBOX360</DefineConstants>
+    <DocumentationFile>bin\Release\MainGame.XML</DocumentationFile>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Xbox 360\Release</OutputPath>
+    <PlatformTarget>x86</PlatformTarget>
+    <Tailcalls>false</Tailcalls>
+    <WarningLevel>3</WarningLevel>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\XNA Game Studio\Microsoft.Xna.GameStudio.targets" />
+  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <ItemGroup>
+    <Compile Include="Units.fs" />
+    <Compile Include="Player.fs" />
+    <Compile Include="Team.fs" />
+    <Compile Include="Ball.fs" />
+    <Compile Include="Controls.fs" />
+    <Compile Include="Pitch.fs" />
+    <Compile Include="Physics.fs" />
+    <Compile Include="Match.fs" />
+    <Compile Include="Tactics.fs" />
+    <Compile Include="PlayerAi.fs" />
+    <Compile Include="Referee.fs" />
+    <Compile Include="Director.fs" />
+    <Compile Include="Rendering.fs" />
+    <Compile Include="Gameplay.fs" />
+    <Compile Include="AssemblyInfo.fs" />
+    <None Include="Script.fsx" />
+    <None Include="..\..\FSharpCore\FSharp.Core.dll">
+      <Link>FSharp.Core.dll</Link>
+    </None>
+    <None Include="..\..\FSharpCore\FSharp.Core.optdata">
+      <Link>FSharp.Core.optdata</Link>
+    </None>
+    <None Include="..\..\FSharpCore\FSharp.Core.sigdata">
+      <Link>FSharp.Core.sigdata</Link>
+    </None>
+    <None Include="..\..\FSharpCore\FSharp.Core.xml">
+      <Link>FSharp.Core.xml</Link>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="FSharp.Core">
+      <HintPath>..\..\xnautils\FSharpCore\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Xna.Framework, Version=4.0.0.0, Culture=neutral, PublicKeyToken=842cf8be1de50553" />
+    <Reference Include="Microsoft.Xna.Framework.Game">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Microsoft XNA\XNA Game Studio\v4.0\References\Windows\x86\Microsoft.Xna.Framework.Game.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Xna.Framework.Graphics">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Microsoft XNA\XNA Game Studio\v4.0\References\Windows\x86\Microsoft.Xna.Framework.Graphics.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib" />
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>4.0</RequiredTargetFramework>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\xnautils\CoopMultiTasking\CoopMultitaskingXbox360.fsproj">
+      <Name>CoopMultitaskingXbox360</Name>
+      <Project>{9af5cb0e-6332-4287-902b-a69f24701dc7}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\xnautils\Core\CoreXbox360.fsproj">
+      <Name>CoreXbox360</Name>
+      <Project>{0ab5e7d9-4e02-4873-9b01-fbfc93d15659}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\xnautils\XNAUtils\XNAUtilsXbox360.fsproj">
+      <Name>XNAUtilsXbox360</Name>
+      <Project>{81034ec4-a1cc-4b0a-8b88-78097ae49a3b}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
