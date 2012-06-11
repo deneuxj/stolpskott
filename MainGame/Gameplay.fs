@@ -68,6 +68,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
                 { pos = TypedVector3<m>(0.0f<m>, 0.0f<m>, 1.0f<m>)
                   speed = TypedVector3<m/s>(0.0f<m/s>, 0.0f<m/s>, 0.0f<m/s>)
                   inPlay = Ball.KickOff(Ball.WaitWhistle, Team.TeamA)
+                  lastTouchedBy = None
                 }
         }
 
@@ -217,11 +218,22 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
             | _ -> ballState
             |> Pitch.boundBall pitch
 
+        let lastTouchedBy =
+            match impulse with
+            | Physics.BallImpulse.Trapped (id, _)
+            | Physics.BallImpulse.BouncedOffPlayer((id, _), _)
+            | Physics.BallImpulse.Kicked((id, _), _)
+            | Physics.BallImpulse.Pushed((id, _), _) -> Some id
+            | _ -> ballState.lastTouchedBy
+
         let ballState =
             if Input.Keyboard.GetState().IsKeyDown(Input.Keys.Space) then
-                { ballState with pos = ballState.pos + TypedVector3<m>(0.0f<_>, 0.0f<_>, 10.0f<_>) }
+                { ballState with
+                    pos = ballState.pos + TypedVector3<m>(0.0f<_>, 0.0f<_>, 10.0f<_>)
+                    lastTouchedBy = lastTouchedBy }
             else
-                ballState
+                { ballState with
+                    lastTouchedBy = lastTouchedBy }
 
         prePad <- pad
         state := { state.Value with teamA = { state.Value.teamA with onPitch = teamA } ; teamB = { state.Value.teamB with onPitch = teamB } ; ball = ballState }

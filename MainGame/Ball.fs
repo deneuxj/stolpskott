@@ -48,6 +48,7 @@ type State =
     { pos : TypedVector3<m>
       speed : TypedVector3<m/s>
       inPlay : InPlay
+      lastTouchedBy : TeamSide option
     }
 
 let ballRadius = 0.12f<m>
