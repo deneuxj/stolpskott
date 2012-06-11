@@ -9,7 +9,7 @@ let penaltyBoxHeight = 16.5f<m>
 let goalBoxWidth = penaltyBoxWidth - 22.0f<m>
 let goalBoxHeight = 5.5f<m>
 let pitchRestitution = 0.5f
-let pitchDrag = 0.5f</s>
+let pitchDrag = 1.0f</s>
 
 type PitchTraits =
     { width : float32<m>
