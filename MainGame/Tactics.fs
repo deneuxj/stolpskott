@@ -92,13 +92,15 @@ let tactics formation side (game : Match.MatchState) =
                     match side with
                     | Team.TeamA -> game.teamB
                     | Team.TeamB -> game.teamA
-                if Array.isEmpty opponents.onPitch then
-                    1.0f
-                else
+                let p0, p1 =
                     opponents.onPitch
-                    |> Seq.map (fun player -> player.pos |> getRelPos)
-                    |> Seq.map (fun { y = y } -> y )
-                    |> Seq.max
+                    |> SeqUtil.minBy2 (fun player -> player.pos |> getRelPos |> fun { y = y } -> -y)
+
+                if p1 > 0 then
+                    opponents.onPitch.[p1].pos |> getRelPos |> fun { y = y } -> y
+                elif p0 > 0 then
+                    opponents.onPitch.[p0].pos |> getRelPos |> fun { y = y } -> y
+                else 1.0f
             (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
 
         // Trapped by own keeper
@@ -110,6 +112,16 @@ let tactics formation side (game : Match.MatchState) =
         | Team.TeamA, Ball.TrappedByKeeper Team.TeamB
         | Team.TeamB, Ball.TrappedByKeeper Team.TeamA ->
             0.0f, 0.5f
+
+        // Kick-in, our team.
+        | Team.TeamA, Ball.KickIn(Team.TeamA, _)
+        | Team.TeamB, Ball.KickIn(Team.TeamB, _) ->
+            0.0f, 0.5f
+
+        // Kick-in, opponents.
+        | Team.TeamA, Ball.KickIn(Team.TeamB, _)
+        | Team.TeamB, Ball.KickIn(Team.TeamA, _) ->
+            0.0f, 0.6f
 
         // Dead ball, our team.
         | Team.TeamA, Ball.DeadBall (Team.TeamA)
