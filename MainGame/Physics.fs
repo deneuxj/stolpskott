@@ -204,6 +204,7 @@ let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
 
 
 let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
+let airDrag = 0.5f</s>
 
 let updateBall goalCenters (dt : float32<s>) players ball =
     let impulse = collidePlayersWithBall ball players
@@ -229,16 +230,21 @@ let updateBall goalCenters (dt : float32<s>) players ball =
     let pos = ball.pos + dt * speed
 
     // Bouncing on the pitch
-    let posZ, speedZ, drag =
+    let posZ, speedZ =
         match pos.Z - Ball.ballRadius with
         | h when h < 0.0f<m> ->
             Ball.ballRadius,
-            -Pitch.pitchRestitution * speed.Z,
-            Pitch.pitchDrag
+            -Pitch.pitchRestitution * speed.Z
         | _ ->
-            pos.Z, speed.Z, 0.0f</s>
+            pos.Z, speed.Z
 
-    let dragAccel = Pitch.pitchDrag * TypedVector3<m/s>(speed.X, speed.Y, 0.0f<_>)
+    let drag =
+        if pos.Z - Ball.ballRadius < 0.1f<m> then
+            Pitch.pitchDrag
+        else
+            airDrag
+
+    let dragAccel = drag * TypedVector3<m/s>(speed.X, speed.Y, speed.Z)
 
     let ball =
         { ball with
