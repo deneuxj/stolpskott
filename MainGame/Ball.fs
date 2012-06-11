@@ -29,21 +29,6 @@ let (|DeadBall|LiveBall|) = function
     | FreeKick (team, _)
     | TrappedByKeeper team -> DeadBall team
 
-(*
-let (|Constrained|PhysicsControlled|) = function
-    | CornerKick (CanKick, _, _)
-    | Penalty (CanKick, _)
-    | KickOff (CanKick, _)
-    | InPlay -> PhysicsControlled
-    | CornerKick (WaitWhistle, _, _)
-    | Penalty (WaitWhistle, _)
-    | KickOff (WaitWhistle, _)
-    | KickIn _
-    | ThrowIn _
-    | FreeKick _
-    | TrappedByKeeper _ -> Constrained
-*)
-
 type State =
     { pos : TypedVector3<m>
       speed : TypedVector3<m/s>
