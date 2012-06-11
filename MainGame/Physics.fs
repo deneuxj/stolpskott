@@ -167,6 +167,8 @@ let goalWidth = 7.32f<m>
 let goalHeight = 2.44f<m>
 let goalPostRadius = 0.07f<m>
 let goalPostRestitution = 1.0f
+let goalNetDepth = 2.0f<m>
+let goalNetRestitution = 0.1f
 
 let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
     let relPos = ball.pos - TypedVector3<m>(goalCenter.X, goalCenter.Y, 0.0f<_>)
@@ -198,10 +200,31 @@ let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
         else
             TypedVector3.Zero
 
+    let collideWithNetBack =
+        if abs(ball.pos.X) < goalWidth / 2.0f &&
+           ball.pos.Z < goalHeight then
+            let dist =
+                if ball.pos.Y > 0.0f<m> then
+                    goalCenter.Y + goalNetDepth - ball.pos.Y
+                else
+                    goalCenter.Y - goalNetDepth - ball.pos.Y
+
+            if abs dist < Ball.ballRadius then
+                let normal =
+                    if ball.pos.Y > 0.0f<m> then
+                        TypedVector3<1>(0.0f, -1.0f, 0.0f)
+                    else
+                        TypedVector3<1>(0.0f, 1.0f, 0.0f)
+                collideLightWithHeavy goalNetRestitution normal ball.speed
+            else
+                TypedVector3.Zero
+        else
+            TypedVector3.Zero
+           
     collideWithPost (-goalWidth / 2.0f) +
     collideWithPost (goalWidth / 2.0f) +
-    collideWithBar
-
+    collideWithBar +
+    collideWithNetBack
 
 let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
 let airDrag = 0.5f</s>
