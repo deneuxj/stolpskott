@@ -270,36 +270,52 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                                 distToBallScore + timeToGoalScore
 
                             fun pos ->
-                                let passTo, _ =
+                                let otherPlayers =
                                     team.onPitch
-                                    |> Seq.mapi (fun i player -> (i, valueOfAttackingPlayer player))
-                                    |> Seq.maxBy snd
-                                let targetPos = team.onPitch.[passTo].pos
-                                if TypedVector.len2(pos - targetPos) > 30.0f<m> then
-                                    CrossingTo targetPos
+                                    |> Array.mapi (fun i player -> (i, player))
+                                    |> Array.filter (fun (_, { pos = pos }) -> TypedVector.dot2(pos - player.pos, player.direction) > 0.0f<m>)
+
+                                if Array.isEmpty otherPlayers then
+                                    None
                                 else
-                                    PassingTo passTo
+                                    let passTo, _ =
+                                        otherPlayers
+                                        |> Array.map (fun (i, player) -> (i, valueOfAttackingPlayer player))
+                                        |> Array.maxBy snd
+                                    let targetPos = team.onPitch.[passTo].pos
+                                    if TypedVector.len2(pos - targetPos) > 30.0f<m> then
+                                        Some (CrossingTo targetPos)
+                                    else
+                                        Some (PassingTo passTo)
 
                         let bestPass = decidePass player.pos
                         let targetPos =
                             match bestPass with
-                            | PassingTo idx -> team.onPitch.[idx].pos
-                            | CrossingTo x -> x
+                            | Some (PassingTo idx) -> Some (team.onPitch.[idx].pos)
+                            | Some (CrossingTo x) -> Some x
+                            | None -> None
                             | _ -> failwith "Unhandled pass type"
                     
-                        let (|ShouldShoot|ShouldRun|ShouldPass|) (playerPos : TypedVector2<m>, targetPos : TypedVector2<m>) =
-                            if TypedVector.len2 (goalPos - playerPos) < 20.0f<m> then
-                                ShouldShoot
-                            elif attackUp() && targetPos.Y < playerPos.Y then
-                                ShouldRun
-                            elif not <| attackUp() && targetPos.Y > playerPos.Y then
-                                ShouldRun
-                            else ShouldPass
+                        let (|ShouldShoot|ShouldRun|ShouldPass|) (playerPos : TypedVector2<m>, targetPos : TypedVector2<m> option) =
+                            match targetPos with
+                            | Some targetPos ->
+                                if TypedVector.len2 (goalPos - playerPos) < 20.0f<m> then
+                                    ShouldShoot
+                                elif attackUp() && targetPos.Y < playerPos.Y then
+                                    ShouldRun
+                                elif not <| attackUp() && targetPos.Y > playerPos.Y then
+                                    ShouldRun
+                                else ShouldPass
+                            | None -> ShouldRun
 
                         match (player.pos, targetPos) with
                         | ShouldPass ->
-                            bestPass |> assign closestToBall
-                            do! waitKick 1.0f<s> closestToBall
+                            match bestPass with
+                            | Some bestPass ->
+                                bestPass |> assign closestToBall
+                                do! waitKick 1.0f<s> closestToBall
+                            | None ->
+                                do! env.WaitNextFrame()
                         | ShouldShoot ->
                             let target = getAbsPos { x = 0.0f ; y = 1.0f }
                             ShootingAtGoal target |> assign closestToBall
@@ -391,7 +407,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 if attackUp() then
                     state.pitch.length / 2.0f - 6.0f<m>
                 else
-                    state.pitch.length / 2.0f + 6.0f<m>
+                    -state.pitch.length / 2.0f + 6.0f<m>
 
             CrossingTo(TypedVector2<m>(0.0f<m>, targetY)) |> assign kicker
             do! waitKick 1.0f<s> kicker
@@ -493,7 +509,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             do! env.WaitUntil <| fun () -> fieldPlayers.IsDead
 
             kickerReady.Trigger()
-            ShootingAtGoal (TypedVector2<m>.Zero) |> assign keeper
+            CrossingTo (TypedVector2<m>.Zero) |> assign keeper
 
             do! waitKick 1.0f<s> keeper
             return! waitUntilBallInPlay
@@ -587,6 +603,7 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
         | Team.TeamB -> matchState.teamB.onPitch
 
     let ballPos2 = TypedVector2<m>(ball.pos.X, ball.pos.Y)
+    let ballSpeed2 = TypedVector2<m/s>(ball.speed.X, ball.speed.Y)
     let distToBall pos =
         pos - ballPos2
         |> TypedVector.len2
@@ -599,6 +616,24 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
             { playerState with direction = dir; activity = Player.Standing; speed = Player.getRunSpeed playerState }
         else
             { playerState with activity = Player.Standing; speed = 0.0f<m/s> }
+
+    let runWithBallTo target =
+        match target - playerState.pos |> TypedVector.tryNormalize2 with
+        | Some dir ->
+            match distToBall playerState.pos with
+            | x when x > 5.0f * Physics.controlMaxDistance ->
+                runToPos ballPos2
+            | x when x > Physics.pushedDistance ->
+                let relPos = ballPos2 - playerState.pos
+                let toBall = TypedVector.normalize2 relPos
+                let side = TypedVector2<1>(toBall.Y, -toBall.X)
+                let proj = TypedVector.dot2(side, side)
+                let newDir = toBall - proj * side |> TypedVector.normalize2
+                { playerState with direction = newDir }
+            | _ ->
+                runToPos ballPos2                        
+        | None ->
+            { playerState with speed = 0.0f<m/s> }
 
     match objective, playerState.activity with
     | _, Player.Fallen _
@@ -650,15 +685,20 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
     | CrossingTo _, Player.Crossing ->
         { playerState with activity = Player.Standing ; speed = 0.0f<m/s> }
     | ShootingAtGoal target, Player.Standing ->
-        match distToBall playerState.pos with
-        | x when x < kickDistance ->
-            match target - playerState.pos |> TypedVector.tryNormalize2 with
-            | Some d ->
-                { playerState with activity = Player.Kicking 0.0f<kf> ; direction = d }
-            | None ->
-                { playerState with speed = 0.0f<m/s> }
-        | _ ->
-            runToPos ballPos2
+        if TypedVector.dot2(target - playerState.pos, playerState.direction) > 0.0f<m> then 
+            match distToBall playerState.pos with
+            | x when x < kickDistance ->
+                match target - playerState.pos |> TypedVector.tryNormalize2 with
+                | Some d ->
+                    { playerState with activity = Player.Kicking 0.0f<kf> ; direction = d }
+                | None ->
+                    { playerState with speed = 0.0f<m/s> }
+            | _ ->
+                runToPos ballPos2
+        else
+            runWithBallTo target
+    | RunningWithBallTo target, Player.Standing ->
+        runWithBallTo target
     | _, _ ->
         playerState
 
