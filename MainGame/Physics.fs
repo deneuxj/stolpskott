@@ -232,10 +232,6 @@ let airDrag = 0.5f</s>
 let updateBall goalCenters (dt : float32<s>) players ball =
     let impulse = collidePlayersWithBall ball players
     
-    match impulse with
-    | Free -> ()
-    | _ -> printfn "%A" impulse
-
     let speed =
         match impulse with
         | Free ->
