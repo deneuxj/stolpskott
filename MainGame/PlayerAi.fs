@@ -155,10 +155,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 |> Array.iteri(fun i v -> RunningTo v |> assign (i + 1))
 
                 do! waitUntilBallInPlay
-
-                // All players follow the tactic.
-                getTeam().onPitch
-                |> Array.iteri(fun i _ -> FollowingTactic |> assign i)
         }
 
     let waitKick maxTime player =
@@ -382,7 +378,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                         | ShouldPass ->
                             match bestPass with
                             | Some bestPass ->
-                                printfn "%A Will try to pass" side
                                 bestPass |> assign closestToBall                                    
                                 let! passed = waitKick maxTime closestToBall
                                 if passed then
@@ -394,7 +389,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                             | None ->
                                 do! env.WaitNextFrame()
                         | ShouldShoot ->
-                            printfn "%A Will try to shoot" side
                             let target = getAbsPos { x = 0.0f ; y = 1.0f }
                             ShootingAtGoal target |> assign closestToBall
                             let! shotCompleted = waitKick maxTime closestToBall
@@ -403,7 +397,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                             else
                                 printfn "Failed to shoot"
                         | ShouldRun ->
-                            printfn "%A Will try to run with the ball" side
                             RunningWithBallTo goalPos
                             |> assign closestToBall
                             do! env.Wait (maxTime / 1.0f<s>)
@@ -415,40 +408,40 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 return()
         }
 
-    let moveToFormation =
+    let orderFormation() =
+        let formation =
+            Tactics.tactics Tactics.formation442 side (getMatchState())
+            |> List.map getAbsPos
+            |> Array.ofList
+
+        formation
+        |> Array.iteri (fun i v -> RunningTo (v, absUp()) |> assign (i+1))
+
+    let waitTeamStill =
         task {
-            let formation =
-                Tactics.tactics Tactics.formation442 side (getMatchState())
-                |> List.map getAbsPos
-                |> Array.ofList
-
-            formation
-            |> Array.iteri (fun i v -> RunningTo (v, absUp()) |> assign (i+1))
-
-            do! env.WaitNextFrame()
-
             do! env.WaitUntil <|
                 fun () ->
                     getTeam().onPitch
                     |> Array.exists (function { activity = Player.Standing ; speed = 0.0f<m/s> } -> false | _ -> true)
-                    |> not
-
-            formation
-            |> Array.iteri (fun i v -> FollowingTactic |> assign (i+1))
+                    |> not        
         }
-
+                
     let defendCorner =
         task {
             let keeper = 0
             RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()) |> assign keeper
-            do! moveToFormation
+
+            orderFormation()
+
             return! waitUntilBallInPlay
         }
 
     let kickCorner pitchSide =
         task {
             let state = getMatchState()
-            do! moveToFormation
+            orderFormation()
+            do! env.WaitNextFrame()
+            do! waitTeamStill
             let x =
                 match pitchSide with
                 | Ball.Left -> -state.pitch.width / 2.0f
@@ -498,13 +491,15 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendThrowIn pitchSide y =
         task {
-            do! moveToFormation
+            orderFormation()
             return! waitUntilBallInPlay
         }
 
     let throwIn pitchSide y =
         task {
-            do! moveToFormation
+            orderFormation()
+            do! env.WaitNextFrame()
+            do! waitTeamStill
 
             // Find the players closest to the throw-in position
             let x =
@@ -564,8 +559,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let kickIn pitchSide =
         task {
-            let fieldPlayers = env.Spawn (fun _ -> moveToFormation)
-
             let state = getMatchState()
             let y =
                 if attackUp() then
@@ -578,17 +571,11 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 | Ball.Right -> Pitch.goalBoxWidth / 2.0f
 
             let keeper = 0
-
             RunningTo (TypedVector2<m>(x, y), absUp()) |> assign keeper
-            
-            do! env.WaitUntil <|
-                fun () ->
-                    getTeam().onPitch.[0].speed > 0.0f<m/s>
-            do! env.WaitUntil <|
-                fun () ->
-                    getTeam().onPitch.[0].speed = 0.0f<m/s>
 
-            do! env.WaitUntil <| fun () -> fieldPlayers.IsDead
+            orderFormation()
+            do! env.WaitNextFrame()
+            do! waitTeamStill
 
             kickerReady.Trigger()
             ShootingAtGoal (TypedVector2<m>.Zero) |> assign keeper
@@ -599,7 +586,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendKickIn =
         task {
-            do! moveToFormation
+            orderFormation()
             return! waitUntilBallInPlay
         }
         
@@ -785,56 +772,3 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
         playerState
 
 
-(*
-let assignObjectives side (gameState0 : Match.MatchState) (gameState1 : Match.MatchState) =
-    let team0, team1 =
-        match side with
-        | Team.TeamA -> gameState0.teamA, gameState1.teamA
-        | Team.TeamB -> gameState0.teamB, gameState1.teamB
-
-    let attackUp = Match.isTeamAttackingUp side gameState1.period
-
-    let getRelPos = Tactics.getRelPos gameState1.pitch attackUp
-
-
-    match gameState0.ball.inPlay, gameState1.ball.inPlay with
-    | _, Ball.DeadBall _ ->
-        team1.onPitch
-        |> Array.map (fun _ -> FollowingTactic)
-    
-    | Ball.DeadBall _, Ball.LiveBall ->
-        let runToBall, _ =
-            team1.onPitch
-            |> Seq.mapi (fun i player -> (i, timeToBall player))
-            |> Seq.minBy snd
-
-        team1.onPitch
-        |> Array.mapi (fun i _ -> if i = runToBall then RunningToBall else FollowingTactic)
-
-    | Ball.LiveBall, Ball.LiveBall ->
-        let goalPos =
-            match attackUp with
-            | true -> TypedVector2<m>(gameState1.pitch.length / 2.0f, gameState1.pitch.width / 2.0f)
-            | false -> TypedVector2<m>(gameState1.pitch.length / 2.0f, -gameState1.pitch.width / 2.0f)
-
-        let distToBall =
-            let pos2 = TypedVector2<m>(gameState1.ball.pos.X, gameState1.ball.pos.Y)
-            fun pos ->
-                TypedVector.len2 (pos2 - pos)
-
-        let closestToBall, _ =
-            team1.onPitch
-            |> Seq.mapi (fun i player -> (i, timeToBall player))
-            |> Seq.minBy snd
-
-            
-        team1.onPitch
-        |> Array.mapi (fun i player ->
-            if i = closestToBall then
-                if distToBall player.pos < 0.1f<m> then                    
-                        
-                else
-                    RunningToBall
-            else
-                FollowingTactic)
-*)
