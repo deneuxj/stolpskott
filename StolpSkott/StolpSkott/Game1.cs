@@ -40,7 +40,7 @@ namespace StolpSkott {
     /// </summary>
     protected override void Initialize() {
       // TODO: Add your initialization logic here
-      gameplay = new CleverRake.StolpSkott.Gameplay.MatchGameplay(this, this.Content, PlayerIndex.One);
+      gameplay = new CleverRake.StolpSkott.Gameplay.MatchGameplay(this, this.Content, PlayerIndex.One, CleverRake.StolpSkott.Team.TeamSide.TeamA);
       this.Components.Add(gameplay);
       base.Initialize();
     }

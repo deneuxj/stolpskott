@@ -221,6 +221,8 @@ let getFrame frames (kf : float32<kf>) =
         |> max 0
     frames.[idx]
 
+let playerRadius = 0.32f<m>
+
 let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper (goalLower : Texture2D) (pitch : Pitch.PitchTraits) (viewX, viewY) sprites =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
@@ -241,7 +243,6 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
         | Player(player, side) ->
             let x = player.pos.X
             let y = player.pos.Y
-            let playerRadius = 0.3f<m>
             let x, y = worldToScreen (x, y)
             let w = 2.0f * playerRadius * ratio |> int
             let sw = 32
@@ -287,8 +288,19 @@ let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, v
 
     sb.Draw(shadow, Rectangle(int x, int y, w, w), color)
 
+let renderHighlights (sb : SpriteBatch) (viewWidth, viewHeight) line highlights (viewX, viewY) =
+    let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
+    let color = Color.Yellow
     
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, allPlayers, ballState : Ball.State, (x, y)) =
+    for x, y in highlights do
+        let x = x - playerRadius
+        let y = y - playerRadius
+        let x, y = worldToScreen (x, y)
+        let w = 2.0f * playerRadius * ratio |> int
+
+        sb.Draw(line, Rectangle(int x, int y, w, 2), color)
+    
+let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, allPlayers, highlightedPlayers, ballState : Ball.State, (x, y)) =
     let viewSize =
         let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
         let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
@@ -301,6 +313,7 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
         renderGrass sb viewSize darkGrass lightGrass (x, y)
         renderLines sb viewSize line pitch (x, y)
         renderBallShadow sb viewSize ball (x, y) ballState.pos
+        renderHighlights sb viewSize line highlightedPlayers (x, y)            
         let sprites =
             [| yield GoalUpper
                yield GoalLower

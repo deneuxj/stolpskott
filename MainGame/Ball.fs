@@ -21,13 +21,13 @@ type InPlay =
 
 let (|DeadBall|LiveBall|) = function
     | InPlay -> LiveBall
-    | KickIn (team, _)
     | KickOff (_, team)
-    | ThrowIn (team, _, _)
     | Penalty (_, team)
+    | CornerKick (_, team, _)
+    | KickIn (team, _)
+    | ThrowIn (team, _, _)
     | FreeKick (team, _)
-    | TrappedByKeeper team
-    | CornerKick (_, team, _) -> DeadBall team
+    | TrappedByKeeper team -> DeadBall team
 
 (*
 let (|Constrained|PhysicsControlled|) = function

@@ -12,7 +12,7 @@ type State =
       ball : Ball.State
     }
 
-type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
+type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSide) =
     inherit DrawableGameComponent(game)
 
     let textures : Rendering.Resources option ref = ref None
@@ -93,6 +93,69 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
     let scheduler = new Scheduler()
     let env = new Environment(scheduler)
 
+    let playerControlled : (Team.TeamSide * int) option ref = ref None
+    let controller =
+        task {
+            while true do
+                do! env.WaitNextFrame()
+                let team() =
+                    match playerSide with
+                    | Team.TeamA -> state.Value.teamA
+                    | Team.TeamB -> state.Value.teamB
+
+                let ballPos2() = TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)
+
+                let getCandidate() =
+                    let ballPos2 = ballPos2()
+                    team().onPitch
+                    |> SeqUtil.minBy (
+                        function
+                        | { pos = pos ; isKeeper = false } ->
+                            pos - ballPos2 |> TypedVector.len2 |> float32
+                        | { isKeeper = true } ->
+                            System.Single.PositiveInfinity)
+
+                let restPeriod = 0.05f<s>
+                let newControledTask =
+                    match playerControlled.Value, state.Value.ball.inPlay with
+                    | None, Ball.InPlay ->
+                        let candidate = getCandidate()
+                        if candidate <= 0 then
+                            task {
+                                playerControlled := None
+                                return()
+                            }
+                        else
+                            task {
+                                playerControlled := Some(playerSide, candidate)
+                                return! env.WaitUnless(
+                                            restPeriod / 1.0f<s>,
+                                            fun() -> state.Value.ball.inPlay <> Ball.InPlay)
+                            }
+
+                    | Some (_, player), Ball.InPlay ->
+                        task {
+                            let candidate = getCandidate()
+                            if candidate <= 0 then
+                                return ()
+                            else
+                                playerControlled := Some(playerSide, candidate)
+                                return! env.WaitUnless(
+                                            restPeriod / 1.0f<s>,
+                                            fun() -> state.Value.ball.inPlay <> Ball.InPlay)
+                        }
+
+                    | _, _ ->
+                        task {
+                            playerControlled := None
+                            return! env.WaitUntil <|
+                                fun () ->
+                                    state.Value.ball.inPlay = Ball.InPlay
+                        }
+
+                do! newControledTask                        
+        }
+
     let mutable x = 0.0f<m>
     let mutable y = 0.0f<m>
 
@@ -143,6 +206,9 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
             kickerReady.Publish
         |> scheduler.AddTask
 
+        controller
+        |> scheduler.AddTask
+
     override this.LoadContent() =
         textures :=
             Some {
@@ -166,28 +232,53 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
         scheduler.RunFor (float32 dt)
 
         let pad = Input.GamePad.GetState(playerIndex)
-        (*
-        let hasBallControl =
-            (state.Value.player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
-        let playerState =
-            Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) state.Value.player
-        *)
+        let humanControledPlayerState =
+            match playerControlled.Value with
+            | Some(playerSide, idx) ->
+                let player =
+                    match playerSide with
+                    | Team.TeamA -> state.Value.teamA.onPitch.[idx]
+                    | Team.TeamB -> state.Value.teamB.onPitch.[idx]
 
-        let teamA =
-            state.Value.teamA.onPitch
-            |> Array.map (Player.updateKeyFrame dt >> Player.updatePlayer dt)
+                let hasBallControl =
+                    (player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
+
+                Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) player
+                |> Some
+            | None ->
+                None
+
+        let updateTeam side =
+            match side with
+            | Team.TeamA -> state.Value.teamA.onPitch
+            | Team.TeamB -> state.Value.teamB.onPitch
             |> Array.mapi (fun i playerState ->
-                match teamAObjectives.Value.TryFind i with
-                | Some objective -> PlayerAi.actPlayerOnObjective Team.TeamA state.Value objective playerState
-                | None -> playerState)
+                match playerControlled.Value with
+                | Some (team, idx) when team = side && idx = i ->
+                    humanControledPlayerState.Value
+                | _ ->
+                    playerState
+                |> Player.updateKeyFrame dt
+                |> Player.updatePlayer dt)
+            |> Array.mapi (fun i playerState ->
+                match playerControlled.Value with
+                | Some (team, idx) when team = side && idx = i ->
+                    playerState
+                | Some _
+                | None ->
+                    let objectives =
+                        match side with
+                        | Team.TeamA -> teamAObjectives.Value
+                        | Team.TeamB -> teamBObjectives.Value
+
+                    match objectives.TryFind i with
+                    | Some objective -> PlayerAi.actPlayerOnObjective side state.Value objective playerState
+                    | None -> playerState)
+        let teamA =
+            updateTeam Team.TeamA
 
         let teamB =
-            state.Value.teamB.onPitch
-            |> Array.map (Player.updateKeyFrame dt >> Player.updatePlayer dt)
-            |> Array.mapi (fun i playerState ->
-                match teamBObjectives.Value.TryFind i with
-                | Some objective -> PlayerAi.actPlayerOnObjective Team.TeamB state.Value objective playerState
-                | None -> playerState)
+            updateTeam Team.TeamB
 
         let allPlayersA =
             teamA
@@ -248,5 +339,15 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex) =
                 state.Value.teamB.onPitch
                 |> Array.map (fun playerState -> (Team.TeamB, playerState))
             let allPlayers = Array.append teamA teamB
-            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, state.Value.ball, (x, y))
+            let highlights =
+                match playerControlled.Value with
+                | Some (side, idx) ->
+                    let player =
+                        match side with
+                        | Team.TeamA -> teamA.[idx] |> snd
+                        | Team.TeamB -> teamB.[idx] |> snd
+                    [ player.pos.X, player.pos.Y ]
+                | None ->
+                    []
+            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, highlights, state.Value.ball, (x, y))
         | _ -> ()
