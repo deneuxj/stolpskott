@@ -17,6 +17,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
 
     let textures : Rendering.Resources option ref = ref None
     let spriteBatch : Graphics.SpriteBatch option ref = ref None
+    let font : Graphics.SpriteFont option ref = ref None
 
     let config : Controls.Configuration =
         { direction = fun state -> state.ThumbSticks.Left.X, state.ThumbSticks.Left.Y
@@ -85,6 +86,9 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
     let assignObjectiveB idx objective =
         teamBObjectives :=
             Map.add idx objective teamBObjectives.Value
+
+    let goalsA = ref 0
+    let goalsB = ref 0
 
     let ballPhysicsEnabled = ref false
     let kickerReady = new Event<_>()
@@ -193,8 +197,13 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             kickerReady
         |> scheduler.AddTask
 
+        let increaseScore =
+            function
+            | Team.TeamA -> goalsA := !goalsA + 1
+            | Team.TeamB -> goalsB := !goalsB + 1
+
         task {
-            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ()) kickerReady.Publish ballKicked.Publish
+            let! _ = Referee.refereeTask env 12.0f (fun () -> state.Value) (fun s -> state := s) increaseScore kickerReady.Publish ballKicked.Publish
             return ()
         }
         |> scheduler.AddTask
@@ -225,6 +234,8 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             }
         spriteBatch :=
             Some (new Graphics.SpriteBatch(this.GraphicsDevice))
+        font :=
+            Some (content.Load("spriteFont1"))
 
     override this.Update(gt) =
         let dt = 1.0f<s> * float32 gt.ElapsedGameTime.TotalSeconds
@@ -357,4 +368,26 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                 | None ->
                     []
             Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, highlights, state.Value.ball, (x, y))
+        | _ -> ()
+
+        match spriteBatch.Value, font.Value with
+        | Some spriteBatch, Some font ->
+            let space = 30.0f
+            let x = base.GraphicsDevice.Viewport.TitleSafeArea.Left |> float32
+            let y = base.GraphicsDevice.Viewport.TitleSafeArea.Top |> float32
+
+            let minutes, seconds =
+                match state.Value with
+                | { periodTime = time } ->
+                    let minutes = int (time / 60.0f)
+                    let seconds = int (time - (float32 minutes) * 60.0f<s>)
+                    minutes, seconds
+
+            try
+                spriteBatch.Begin()
+                spriteBatch.DrawString(font, goalsA.Value.ToString(), Vector2(x, y), Color.Blue)
+                spriteBatch.DrawString(font, goalsB.Value.ToString(), Vector2(x + space, y), Color.Red)
+                spriteBatch.DrawString(font, sprintf "%d:%d" minutes seconds, Vector2(x + 5.0f * space, y), Color.Black)
+            finally
+                spriteBatch.End()
         | _ -> ()

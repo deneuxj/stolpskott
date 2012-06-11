@@ -13,7 +13,7 @@ namespace StolpSkott {
   /// <summary>
   /// This is the main type for your game
   /// </summary>
-  public class Game1 : Microsoft.Xna.Framework.Game {
+  public class Game1 : Microsoft.Xna.Framework.Game, CleverRake.XnaUtils.Application.IUiContentProvider {
     GraphicsDeviceManager graphics;
     SpriteBatch spriteBatch;
     Texture2D darkGrass;
@@ -23,8 +23,12 @@ namespace StolpSkott {
     Texture2D ball;
     Texture2D goalUpper;
     Texture2D goalLower;
+    SpriteFont font;
     float x = 0.0f;
     float y = 0.0f;
+    CleverRake.XnaUtils.Application.ScreenManager screenManager;
+    CleverRake.XnaUtils.CoopMultiTasking.Sys.Environment menuEnvironment;
+    CleverRake.XnaUtils.CoopMultiTasking.Sys.Scheduler scheduler;
     DrawableGameComponent gameplay;
 
     public Game1() {
@@ -40,8 +44,22 @@ namespace StolpSkott {
     /// </summary>
     protected override void Initialize() {
       // TODO: Add your initialization logic here
-      gameplay = new CleverRake.StolpSkott.Gameplay.MatchGameplay(this, this.Content, PlayerIndex.One, CleverRake.StolpSkott.Team.TeamSide.TeamA);
-      this.Components.Add(gameplay);
+      scheduler = new CleverRake.XnaUtils.CoopMultiTasking.Sys.Scheduler();
+      menuEnvironment = new CleverRake.XnaUtils.CoopMultiTasking.Sys.Environment(scheduler);
+      screenManager = new CleverRake.XnaUtils.Application.ScreenManager(this, this);
+      scheduler.AddTask(CleverRake.StolpSkott.Menus.mainTask(menuEnvironment, screenManager));
+      this.Components.Add(screenManager);
+
+      var gamerServices = new GamerServicesComponent(this);
+      this.Components.Add(gamerServices);
+
+      CleverRake.StolpSkott.Menus.registerStartGame(playerIndex =>
+      {
+          screenManager.Enabled = false;
+          screenManager.Visible = false;
+          gameplay = new CleverRake.StolpSkott.Gameplay.MatchGameplay(this, this.Content, PlayerIndex.One, CleverRake.StolpSkott.Team.TeamSide.TeamA);
+          this.Components.Add(gameplay);
+      });
       base.Initialize();
     }
 
@@ -61,6 +79,7 @@ namespace StolpSkott {
       goalLower = Content.Load<Texture2D>("goal-bottom");
       goalUpper = Content.Load<Texture2D>("goal-top");
       ball = Content.Load<Texture2D>("ball");
+      font = Content.Load<SpriteFont>("spriteFont1");
     }
 
     /// <summary>
@@ -78,11 +97,12 @@ namespace StolpSkott {
     /// <param name="gameTime">Provides a snapshot of timing values.</param>
     protected override void Update(GameTime gameTime) {
       // Allows the game to exit
-      if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
+      if (screenManager.Visible && GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
         this.Exit();
 
       // TODO: Add your update logic here
       float k = 10.0f * (float)gameTime.ElapsedGameTime.TotalSeconds;
+      scheduler.RunFor((float)gameTime.ElapsedGameTime.TotalSeconds);
 
       x += GamePad.GetState(PlayerIndex.One).ThumbSticks.Left.X * k;
       y += GamePad.GetState(PlayerIndex.One).ThumbSticks.Left.Y * k;
@@ -94,10 +114,30 @@ namespace StolpSkott {
     /// </summary>
     /// <param name="gameTime">Provides a snapshot of timing values.</param>
     protected override void Draw(GameTime gameTime) {
-      GraphicsDevice.Clear(Color.CornflowerBlue);
+      GraphicsDevice.Clear(Color.DarkGreen);
 
       // TODO: Add your drawing code here
       base.Draw(gameTime);
+    }
+
+    Texture2D CleverRake.XnaUtils.Application.IUiContentProvider.Blank
+    {
+        get { return white; }
+    }
+
+    SpriteFont CleverRake.XnaUtils.Application.IUiContentProvider.Font1
+    {
+        get { return font; }
+    }
+
+    SpriteFont CleverRake.XnaUtils.Application.IUiContentProvider.Font2
+    {
+        get { return font; }
+    }
+
+    SpriteBatch CleverRake.XnaUtils.Application.IUiContentProvider.SpriteBatch
+    {
+        get { return spriteBatch; }
     }
   }
 }
