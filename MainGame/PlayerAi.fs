@@ -301,6 +301,9 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                                 let timeToGoal =
                                     TypedVector.len2(player.pos - goalPos) / Player.getRunSpeed player
 
+                                let distanceToOwnGoal =
+                                    TypedVector.len2(player.pos - getAbsPos { x = 0.0f ; y = -1.0f })
+
                                 let distToBallScore =
                                     let bestDist = 15.0f<m>
                                     let span = 5.0f<m>
@@ -310,7 +313,13 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                                     let maxTime = 10.0f<s>
                                     max 0.0f ((maxTime - timeToGoal) / maxTime)
 
-                                distToBallScore + timeToGoalScore
+                                let crossToOwnGoalPenalty =
+                                    if distanceToOwnGoal < 30.0f<m> && TypedVector.len2(player.pos - ballPos2) > 20.0f<m> then
+                                        -1.0f
+                                    else
+                                        0.0f
+
+                                distToBallScore + timeToGoalScore + crossToOwnGoalPenalty
 
                             fun pos ->
                                 let otherPlayers =
@@ -340,25 +349,40 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                             | _ -> failwith "Unhandled pass type"
                     
                         let (|ShouldShoot|ShouldRun|ShouldPass|) (playerPos : TypedVector2<m>, targetPos : TypedVector2<m> option) =
-                            match targetPos with
-                            | Some targetPos ->
-                                // Shoot if close to the goal
-                                if TypedVector.len2 (goalPos - playerPos) < 25.0f<m> then
+                            let distToGoal = 
+                                goalPos - playerPos |> TypedVector.len2
+                            // Shoot if close to the goal
+                            if distToGoal < 6.0f<m> then
+                                ShouldShoot
+                            elif distToGoal < 30.0f<m> then
+                                let dirToGoal =
+                                    goalPos - playerPos |> TypedVector.tryNormalize2
+                                match dirToGoal with
+                                | Some d ->
+                                    if d.X < 0.2f then
+                                        ShouldShoot
+                                    else
+                                        ShouldRun
+                                | None ->
                                     ShouldShoot
-                                // Run with the ball if in opponent's half and the pass receiver is further back
-                                elif getRelY playerPos > 0.0f && getRelY targetPos < getRelY playerPos then
-                                    ShouldRun
-                                // Run with the ball if pass receiver is too close
-                                elif TypedVector.len2 (targetPos - playerPos) < 10.0f<m> then
-                                    ShouldRun
-                                else ShouldPass
-                            | None -> ShouldRun
+                            else
+                                match targetPos with
+                                | Some targetPos ->                                         
+                                    // Run with the ball if in opponent's half and the pass receiver is further back
+                                    if getRelY playerPos > 0.0f && getRelY targetPos < getRelY playerPos then
+                                        ShouldRun
+                                    // Run with the ball if pass receiver is too close
+                                    elif TypedVector.len2 (targetPos - playerPos) < 10.0f<m> then
+                                        ShouldRun
+                                    else ShouldPass
+                                | None -> ShouldRun
 
-                        let maxTime = 2.0f<s>
+                        let maxTime = 1.0f<s>
                         match (player.pos, targetPos) with
                         | ShouldPass ->
                             match bestPass with
                             | Some bestPass ->
+                                printfn "%A Will try to pass" side
                                 bestPass |> assign closestToBall                                    
                                 let! passed = waitKick maxTime closestToBall
                                 if passed then
@@ -370,11 +394,16 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                             | None ->
                                 do! env.WaitNextFrame()
                         | ShouldShoot ->
+                            printfn "%A Will try to shoot" side
                             let target = getAbsPos { x = 0.0f ; y = 1.0f }
                             ShootingAtGoal target |> assign closestToBall
-                            let! _ = waitKick maxTime closestToBall
-                            ()
+                            let! shotCompleted = waitKick maxTime closestToBall
+                            if shotCompleted then
+                                printfn "SHOOT!"
+                            else
+                                printfn "Failed to shoot"
                         | ShouldRun ->
+                            printfn "%A Will try to run with the ball" side
                             RunningWithBallTo goalPos
                             |> assign closestToBall
                             do! env.Wait (maxTime / 1.0f<s>)
@@ -680,7 +709,7 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
                 let relPos = ballPos2 - playerState.pos
                 let toBall = TypedVector.normalize2 relPos
                 let side = TypedVector2<1>(toBall.Y, -toBall.X)
-                let proj = TypedVector.dot2(side, side)
+                let proj = TypedVector.dot2(dir, side)
                 let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
                 { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
             | _ ->
@@ -745,7 +774,7 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
                 | Some d ->
                     { playerState with activity = Player.Kicking 0.0f<kf> ; direction = d }
                 | None ->
-                    { playerState with speed = 0.0f<m/s> }
+                    { playerState with activity = Player.Kicking 0.0f<kf> }
             | _ ->
                 runToPos ballPos2
         else
