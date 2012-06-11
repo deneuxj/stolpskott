@@ -8,7 +8,7 @@ open Match
 
 let wallDistance = 9.15f<m>
 
-let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) (kickerReady : IEvent<_>) =
+let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) (kickerReady : IEvent<_>) (ballKicked : IEvent<_>) =
     let watch = env.NewStopwatch()
     let scoreA = ref 0
     let scoreB = ref 0
@@ -226,12 +226,8 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                         ||
                         getMatchState().ball.speed = TypedVector3<m/s>.Zero
 
-                // Wait for the ball to move
-                do! env.WaitUntil <|
-                    fun() ->
-                        !killed
-                        ||
-                        getMatchState().ball.speed <> TypedVector3<m/s>.Zero
+                // Wait for the ball to be kicked
+                let! kickerTeam = env.AwaitEvent(ballKicked)
 
                 // The ball is now alive
                 if not <| !killed then
