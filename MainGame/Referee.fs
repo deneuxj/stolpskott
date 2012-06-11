@@ -33,23 +33,6 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
             { state with period = Match.MatchOver }
         | _ -> state
 
-    let whoTouchedTheBallLast state player =
-        match state with
-        | { teamA = teamA ; teamB = teamB } ->
-            let touched (team : Team.TeamSide) players =
-                players
-                |> Array.tryFind (fun player ->
-                    match Physics.collideBallWithPlayer (team, player) state.ball with
-                    | Physics.Free -> false
-                    | _ -> true)
-            match touched Team.TeamA teamA.onPitch with
-            | None ->
-                match touched Team.TeamB teamB.onPitch with
-                | None -> player
-                | Some player -> Some(Team.TeamB, player)
-            | Some player ->
-                Some(Team.TeamA, player)
-
     let (|InUpperGoal|InLowerGoal|OutLeft|OutRight|OutUpper|OutLower|Other|) (state : MatchState) =
         if state.ball.pos.X > -Physics.goalWidth / 2.0f &&
            state.ball.pos.X < Physics.goalWidth / 2.0f &&
@@ -71,21 +54,22 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
         else
             Other
 
-    let switchToDeadBall (state : MatchState) toucher =
-        let otherTeam = function
-        | None -> Team.TeamA
-        | Some (Team.TeamA, _) -> Team.TeamB
-        | Some (Team.TeamB, _) -> Team.TeamA
+    let switchToDeadBall (state : MatchState) =
+        let otherTeam =
+            match state.ball.lastTouchedBy with
+            | None -> Team.TeamA
+            | Some Team.TeamA -> Team.TeamB
+            | Some Team.TeamB -> Team.TeamA
 
         match state.ball.inPlay with
         | Ball.DeadBall _-> state
         | Ball.LiveBall ->
             match state with
             | OutRight ->
-                { state with ball = { state.ball with inPlay = Ball.ThrowIn(otherTeam toucher, Ball.Right, state.ball.pos.Y) } }
+                { state with ball = { state.ball with inPlay = Ball.ThrowIn(otherTeam, Ball.Right, state.ball.pos.Y) } }
             
             | OutLeft ->
-                { state with ball = { state.ball with inPlay = Ball.ThrowIn(otherTeam toucher, Ball.Left, state.ball.pos.Y) } }
+                { state with ball = { state.ball with inPlay = Ball.ThrowIn(otherTeam, Ball.Left, state.ball.pos.Y) } }
             
             | InUpperGoal | InLowerGoal ->
                 let scoringTeam =
@@ -114,14 +98,12 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                 let pitchSide =
                     if state.ball.pos.X > 0.0f<m> then Ball.Right else Ball.Left
 
-                match toucher, homeTeam with
-                | Some (Team.TeamA, _), Team.TeamA
-                | Some (Team.TeamB, _), Team.TeamB ->
+                if otherTeam <> homeTeam then
                     { state with
                         ball = { state.ball with
-                                    inPlay = Ball.CornerKick(Ball.WaitWhistle, Team.otherSide homeTeam, pitchSide) }
+                                    inPlay = Ball.CornerKick(Ball.WaitWhistle, otherTeam, pitchSide) }
                     }
-                | _ ->
+                else
                     { state with
                         ball = { state.ball with
                                     inPlay = Ball.KickIn(homeTeam, pitchSide) }
@@ -256,27 +238,14 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                     do! makeBallLive.Send()
         }
 
-    let rec main toucher killed =
+    let rec main killed =
         task {            
             match getMatchState().period with
             | Match.MatchOver -> return ()
             | _ ->
                 let state = getMatchState()
-                let toucher' = whoTouchedTheBallLast state toucher
-                match toucher, toucher' with
-                | None, Some t' ->
-                    printfn "NTouched: %A" (fst t')
-                | Some t, Some t' ->
-                    if fst t <> fst t' then
-                        printfn "Touched: %A" (fst t')
-                | Some _, None ->
-                    printfn "Touched: NONE?!"
-                | None, None ->
-                    ()
-                let toucher = toucher'
-
                 let state = manageMatchTime state
-                let state = switchToDeadBall state toucher
+                let state = switchToDeadBall state
                 match getMatchState().ball.inPlay, state.ball.inPlay with
                 | Ball.LiveBall, Ball.DeadBall _ ->
                     printfn "DEAD BALL"
@@ -303,11 +272,11 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                 let state = { state with ball = { state.ball with inPlay = inPlay } }
                 setMatchState(state)
                 do! env.WaitNextFrame()
-                return! main toucher killed
+                return! main killed
         }
 
     task {
-        let main = env.Spawn (main None)
+        let main = env.Spawn main
         let whistler = env.Spawn engagement
         let ballReviver = env.Spawn switchToLiveBall
         do! env.WaitUntil (fun () -> main.IsDead)
