@@ -93,6 +93,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
     let ballPhysicsEnabled = ref false
     let kickerReady = new Event<_>()
     let ballKicked = new Event<Team.TeamSide>()
+    let matchOver = new Event<int * int>()
 
     let mutable prePad = Input.GamePad.GetState(playerIndex)
     let scheduler = new Scheduler()
@@ -203,7 +204,8 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             | Team.TeamB -> goalsB := !goalsB + 1
 
         task {
-            let! _ = Referee.refereeTask env 12.0f (fun () -> state.Value) (fun s -> state := s) increaseScore kickerReady.Publish ballKicked.Publish
+            let speedUp = 15.0f // Games last 6 minutes
+            let! _ = Referee.refereeTask env speedUp (fun () -> state.Value) (fun s -> state := s) increaseScore kickerReady.Publish ballKicked.Publish
             return ()
         }
         |> scheduler.AddTask
@@ -238,6 +240,12 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             Some (content.Load("spriteFont1"))
 
     override this.Update(gt) =
+        match state.Value.period with
+        | Match.MatchOver ->
+            matchOver.Trigger(goalsA.Value, goalsB.Value)
+        | _ ->
+            ()
+
         let dt = 1.0f<s> * float32 gt.ElapsedGameTime.TotalSeconds
         this.UpdateDebugView(dt)
 
@@ -391,3 +399,6 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             finally
                 spriteBatch.End()
         | _ -> ()
+
+    [<CLIEvent>]
+    member this.MatchOver = matchOver.Publish

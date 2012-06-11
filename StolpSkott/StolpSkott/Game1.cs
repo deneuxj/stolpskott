@@ -29,7 +29,7 @@ namespace StolpSkott {
     CleverRake.XnaUtils.Application.ScreenManager screenManager;
     CleverRake.XnaUtils.CoopMultiTasking.Sys.Environment menuEnvironment;
     CleverRake.XnaUtils.CoopMultiTasking.Sys.Scheduler scheduler;
-    DrawableGameComponent gameplay;
+    CleverRake.StolpSkott.Gameplay.MatchGameplay gameplay;
 
     public Game1() {
       graphics = new GraphicsDeviceManager(this);
@@ -58,6 +58,13 @@ namespace StolpSkott {
           screenManager.Enabled = false;
           screenManager.Visible = false;
           gameplay = new CleverRake.StolpSkott.Gameplay.MatchGameplay(this, this.Content, PlayerIndex.One, CleverRake.StolpSkott.Team.TeamSide.TeamA);
+          gameplay.MatchOver += (src, score) =>
+          {
+              this.Components.Remove(gameplay);
+              screenManager.Enabled = true;
+              screenManager.Visible = true;
+              scheduler.AddTask(CleverRake.StolpSkott.Menus.afterMatch(menuEnvironment, screenManager, playerIndex, score.Item1, score.Item2));
+          };
           this.Components.Add(gameplay);
       });
       base.Initialize();
