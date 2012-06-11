@@ -88,6 +88,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
 
     let ballPhysicsEnabled = ref false
     let kickerReady = new Event<_>()
+    let ballKicked = new Event<Team.TeamSide>()
 
     let mutable prePad = Input.GamePad.GetState(playerIndex)
     let scheduler = new Scheduler()
@@ -193,7 +194,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
         |> scheduler.AddTask
 
         task {
-            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ()) kickerReady.Publish
+            let! _ = Referee.refereeTask env 0.0f (fun () -> state.Value) (fun s -> state := s) (fun _ -> ()) kickerReady.Publish ballKicked.Publish
             return ()
         }
         |> scheduler.AddTask
@@ -316,6 +317,12 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             | Physics.BallImpulse.Kicked((id, _), _)
             | Physics.BallImpulse.Pushed((id, _), _) -> Some id
             | _ -> ballState.lastTouchedBy
+
+        match impulse with
+        | Physics.BallImpulse.BouncedOffPlayer ((id, _), _)
+        | Physics.BallImpulse.Kicked ((id, _), _) ->
+            ballKicked.Trigger(id)
+        | _ -> ()
 
         let ballState =
             if Input.Keyboard.GetState().IsKeyDown(Input.Keys.Space) then
