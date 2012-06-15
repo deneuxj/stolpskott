@@ -312,7 +312,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
 
         let ballState, impulse =
             if ballPhysicsEnabled.Value then
-                Physics.updateBall goalCenters dt allPlayers state.Value.ball
+                Physics.updateBall state.Value.pitch dt allPlayers state.Value.ball
             else
                 state.Value.ball, Physics.Free
 

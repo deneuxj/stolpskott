@@ -15,6 +15,7 @@ type Activity =
     | Kicking of float32<kf>
     | Fallen of float32<kf>
     | KeeperDive of float32<kf>
+    | Stumbling of float32<s>
 
 type Traits =
     { speed : float32<m/s>
@@ -46,14 +47,15 @@ let tacklingLength = 2.0f<s>
 let kickingLength = 0.2f<s>
 let fallenLength = 1.0f<s>
 let keeperDiveLength = 0.75f<s>
+let stumbleTimeAfterKick = 0.5f<s>
 
 let updateKeyFrame (dt : float32<s>) player =
     let activity =
         match player.activity with
         | Standing -> Standing
         | Trapping -> Trapping
-        | Passing -> Passing
-        | Crossing -> Crossing
+        | Passing -> Stumbling stumbleTimeAfterKick
+        | Crossing -> Stumbling stumbleTimeAfterKick
         | Jumping kf ->
             let kf = kf + 1.0f<kf> * dt / jumpingLength
             if kf < 1.0f<kf> then 
@@ -84,6 +86,11 @@ let updateKeyFrame (dt : float32<s>) player =
                 KeeperDive kf
             else
                 Standing
+        | Stumbling timeLeft ->
+            if timeLeft < 0.0f<s> then
+                Standing
+            else
+                Stumbling (timeLeft - dt)
 
     { player with activity = activity }
 
@@ -102,6 +109,7 @@ let updatePlayer (dt : float32<s>) player =
         match player.activity with
         | Trapping
         | Passing
+        | Stumbling _
         | Fallen _ -> 0.0f<m/s>
 
         | Standing

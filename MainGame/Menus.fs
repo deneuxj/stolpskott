@@ -16,6 +16,12 @@ type MainMenuActions =
     | Controls
     | Start
 
+let quickTask env =
+    task {
+        startGame.Trigger(PlayerIndex.One)
+        return()
+    }
+
 let mainTask env (screenManager : ScreenManager) =
     task {
         use pressStart = new PressStartScreen.PressStartScreen(env, 0.5f, 0.5f, 0.5f)

@@ -700,12 +700,16 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
                 let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
                 { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
             | _ ->
-                { playerState with direction = dir ; speed = Player.getRunSpeed playerState }
+                if TypedVector.dot2(ballPos2 - playerState.pos, dir) >= 0.0f<m> then
+                    { playerState with direction = dir ; speed = Player.getRunSpeed playerState }
+                else // Ball behind the player
+                    { playerState with direction = -1.0f * playerState.direction ; speed = Player.getRunSpeed playerState }
         | None ->
-            { playerState with speed = 0.0f<m/s> }
+            runToPos target
 
     match objective, playerState.activity with
     | _, Player.Fallen _
+    | _, Player.Stumbling _
     | _, Player.Jumping _
     | _, Player.KeeperDive _
     | _, Player.Kicking _
@@ -756,6 +760,8 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
     | ShootingAtGoal target, Player.Standing ->
         if TypedVector.dot2(target - playerState.pos, playerState.direction) > 0.0f<m> then 
             match distToBall playerState.pos with
+            | x when x < Physics.pushedDistance ->
+                runToPos (playerState.pos + ballPos2 - target)
             | x when x < kickDistance ->
                 match target - playerState.pos |> TypedVector.tryNormalize2 with
                 | Some d ->
@@ -766,9 +772,11 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
                 runToPos ballPos2
         else
             runWithBallTo target
+    | ShootingAtGoal _, Player.Trapping ->
+        { playerState with activity = Player.Standing }
     | RunningWithBallTo target, Player.Standing ->
         runWithBallTo target
-    | _, _ ->
-        playerState
+    | RunningWithBallTo target, Player.Trapping ->
+        { playerState with activity = Player.Standing }
 
 

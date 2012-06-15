@@ -47,7 +47,11 @@ namespace StolpSkott {
       scheduler = new CleverRake.XnaUtils.CoopMultiTasking.Sys.Scheduler();
       menuEnvironment = new CleverRake.XnaUtils.CoopMultiTasking.Sys.Environment(scheduler);
       screenManager = new CleverRake.XnaUtils.Application.ScreenManager(this, this);
+#if XBOX360
       scheduler.AddTask(CleverRake.StolpSkott.Menus.mainTask(menuEnvironment, screenManager));
+#else
+      scheduler.AddTask(CleverRake.StolpSkott.Menus.quickTask(menuEnvironment));
+#endif
       this.Components.Add(screenManager);
 
       var gamerServices = new GamerServicesComponent(this);

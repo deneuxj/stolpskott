@@ -38,27 +38,20 @@ let updateControl config dt prePad pad hasBallControl isBallHigh (player : Playe
         else
             { player with activity = Standing ; direction = dir ; speed = speed }
 
-    | Player.Crossing ->
+    | Crossing ->
         { player with activity = Standing }
                 
-    | Player.Jumping _ ->
-        player
-
-    | Player.Tackling _ ->
-        player
-
-    | Player.Trapping ->
+    | Trapping ->
         if config.trap pad then
             { player with direction = dir }
         else
             { player with activity = Passing }
 
-    | Player.Passing ->
-        { player with activity = Standing }
-
-    | Player.Kicking(kf) ->
-        player
-
+    | Tackling _
+    | Jumping _
+    | Passing
+    | Kicking _
+    | Player.Stumbling _
     | Player.Fallen _ ->
         player
 

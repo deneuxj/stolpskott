@@ -116,7 +116,8 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
                 Kicked(playerId, kick)
             else
                 Free
-                
+
+        | Player.Stumbling _                
         | Player.Tackling _ ->
             if isBallGoingTowardsPlayer && dist < controlMaxDistance then
                 BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
@@ -132,10 +133,10 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
                 Free
 
         | Player.Standing _ ->
-            let canControl =
-                player.speed > 0.0f<m/s> &&
-                TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
-                relSpeed.Length < maxBallControlSpeed * MathHelper.Lerp(0.8f, 1.0f, player.traits.ballControl)
+            let canControl = true
+                //player.speed > 0.0f<m/s> &&
+                //TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
+                //relSpeed.Length < maxBallControlSpeed * MathHelper.Lerp(0.8f, 1.0f, player.traits.ballControl)
 
             if canControl && isBallGoingTowardsPlayer && dist < pushedDistance then
                 let factor = MathHelper.Lerp(maxPushSpeedFactor, minPushSpeedFactor, player.traits.ballControl)
@@ -163,14 +164,19 @@ let collidePlayersWithBall ball players =
 
     impulse
 
+type Goal = UpperGoal | LowerGoal
 let goalWidth = 7.32f<m>
 let goalHeight = 2.44f<m>
 let goalPostRadius = 0.07f<m>
-let goalPostRestitution = 1.0f
-let goalNetDepth = 2.0f<m>
-let goalNetRestitution = 0.1f
+let goalPostRestitution = 2.0f
+let goalNetDepth = 1.5f<m>
+let goalNetRestitution = 1.2f
 
-let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
+let collideGoalWithBall (pitch : Pitch.PitchTraits) goal ball =
+    let goalCenter =
+        let y = pitch.length * match goal with UpperGoal -> 0.5f | LowerGoal -> -0.5f
+        TypedVector2<m>(0.0f<m>, y)
+        
     let relPos = ball.pos - TypedVector3<m>(goalCenter.X, goalCenter.Y, 0.0f<_>)
 
     let collideWithPost x =
@@ -201,20 +207,21 @@ let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
             TypedVector3.Zero
 
     let collideWithNetBack =
-        if abs(ball.pos.X) < goalWidth / 2.0f &&
+        if abs(relPos.X) < goalWidth / 2.0f &&
            ball.pos.Z < goalHeight then
             let dist =
-                if ball.pos.Y > 0.0f<m> then
+                match goal with
+                | UpperGoal ->
                     goalCenter.Y + goalNetDepth - ball.pos.Y
-                else
+                | LowerGoal ->
                     goalCenter.Y - goalNetDepth - ball.pos.Y
 
-            if abs dist < Ball.ballRadius then
-                let normal =
-                    if ball.pos.Y > 0.0f<m> then
-                        TypedVector3<1>(0.0f, -1.0f, 0.0f)
-                    else
-                        TypedVector3<1>(0.0f, 1.0f, 0.0f)
+            if abs dist < 0.5f<m> then
+                let normalY =
+                    match goal with
+                    | UpperGoal -> -1.0f
+                    | LowerGoal -> 1.0f
+                let normal = TypedVector3<1>(0.0f, normalY, 0.0f)
                 collideLightWithHeavy goalNetRestitution normal ball.speed
             else
                 TypedVector3.Zero
@@ -229,7 +236,7 @@ let collideGoalWithBall ball (goalCenter : TypedVector2<m>) =
 let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
 let airDrag = 0.5f</s>
 
-let updateBall goalCenters (dt : float32<s>) players ball =
+let updateBall pitch (dt : float32<s>) players ball =
     let impulse = collidePlayersWithBall ball players
     
     let speed =
@@ -272,7 +279,7 @@ let updateBall goalCenters (dt : float32<s>) players ball =
 
     // Bouncing against goal posts
     let goalImpulses =
-        goalCenters
-        |> Seq.sumBy (collideGoalWithBall ball)
+        [ UpperGoal ; LowerGoal ]
+        |> Seq.sumBy (fun goal -> collideGoalWithBall pitch goal ball)
 
     { ball with speed = ball.speed + goalImpulses }, impulse
