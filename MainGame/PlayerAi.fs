@@ -689,21 +689,26 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
     let runWithBallTo target =
         match target - playerState.pos |> TypedVector.tryNormalize2 with
         | Some dir ->
-            match distToBall playerState.pos with
-            | x when x > 2.0f * Physics.controlMaxDistance ->
-                runToPos ballPos2
-            | x when x > (5.0f * Physics.pushedDistance + Physics.controlMaxDistance) / 6.0f ->
-                let relPos = ballPos2 - playerState.pos
-                let toBall = TypedVector.normalize2 relPos
-                let side = TypedVector2<1>(toBall.Y, -toBall.X)
-                let proj = TypedVector.dot2(dir, side)
-                let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
-                { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
-            | _ ->
-                if TypedVector.dot2(ballPos2 - playerState.pos, dir) >= 0.0f<m> then
-                    { playerState with direction = dir ; speed = Player.getRunSpeed playerState }
-                else // Ball behind the player
-                    { playerState with direction = -1.0f * playerState.direction ; speed = Player.getRunSpeed playerState }
+            if TypedVector.dot2(ballPos2 - playerState.pos, dir) >= 0.0f<m> then
+                match distToBall playerState.pos with
+                | x when x > 2.0f * Physics.controlMaxDistance ->
+                    runToPos ballPos2
+                | x when x > (5.0f * Physics.pushedDistance + Physics.controlMaxDistance) / 6.0f ->
+                    let relPos = ballPos2 - playerState.pos
+                    let toBall = TypedVector.normalize2 relPos
+                    let side = TypedVector2<1>(toBall.Y, -toBall.X)
+                    let proj = TypedVector.dot2(dir, side)
+                    let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
+                    { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
+                | _ ->
+                    runToPos target
+            else // Ball behind the player
+                match distToBall playerState.pos with
+                | x when x < Physics.controlMaxDistance ->
+                    { playerState with direction = dir ; speed = 0.0f<m/s> ; activity = Player.Trapping }
+                | _ ->
+                    runToPos ballPos2
+
         | None ->
             runToPos target
 
@@ -744,7 +749,7 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
         | Some d ->
             { playerState with direction = d ; activity = Player.Passing }
     | _, Player.Passing ->
-        { playerState with activity = Player.Standing }
+        { playerState with activity = Player.Stumbling 0.0f<s> }
     | CrossingTo pos, Player.Standing ->
         match distToBall playerState.pos with
         | x when x < passDistance ->
@@ -772,11 +777,10 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
                 runToPos ballPos2
         else
             runWithBallTo target
-    | ShootingAtGoal _, Player.Trapping ->
-        { playerState with activity = Player.Standing }
+    
     | RunningWithBallTo target, Player.Standing ->
         runWithBallTo target
-    | RunningWithBallTo target, Player.Trapping ->
-        { playerState with activity = Player.Standing }
 
-
+    | ShootingAtGoal _, Player.Trapping
+    | RunningWithBallTo _, Player.Trapping ->
+        { playerState with activity = Player.Passing }
