@@ -42,9 +42,9 @@ let pushedDistance = 0.3f<m> // Distance before the ball is pushed by a player.
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
-let keeperBounceRestitution = 0.5f // Bounciness of the keeper-ball collisions when the keeper fails to catch the ball
-let playerBounceRestitution = 0.8f // Bounciness of player-ball collisions
-let playerTackleRestitution = 0.5f // Bounciness of collisions between tackling players and the ball
+let keeperBounceRestitution = 1.5f // Bounciness of the keeper-ball collisions when the keeper fails to catch the ball
+let playerBounceRestitution = 1.8f // Bounciness of player-ball collisions
+let playerTackleRestitution = 1.5f // Bounciness of collisions between tackling players and the ball
 let maxBallControlSpeed = 20.0f<m/s> // Maximum speed relative to the player under which control is achieved
 let minPushSpeedFactor = 1.25f // Affects how far good players push the ball when they have control over it
 let maxPushSpeedFactor = 1.5f // Affects how far poor players push the ball when they have control over it
@@ -119,7 +119,12 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
 
         | Player.Stumbling _                
         | Player.Tackling _ ->
-            if isBallGoingTowardsPlayer && dist < controlMaxDistance then
+            let f =
+                match player.activity with
+                | Player.Tackling _ -> 2.0f
+                | _ -> 1.0f
+
+            if isBallGoingTowardsPlayer && dist < f * controlMaxDistance then
                 BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
             else
                 Free
@@ -169,7 +174,7 @@ let goalWidth = 7.32f<m>
 let goalHeight = 2.44f<m>
 let goalPostRadius = 0.07f<m>
 let goalPostRestitution = 2.0f
-let goalNetDepth = 1.5f<m>
+let goalNetDepth = 1.3f<m>
 let goalNetRestitution = 1.2f
 
 let collideGoalWithBall (pitch : Pitch.PitchTraits) goal ball =
@@ -206,9 +211,15 @@ let collideGoalWithBall (pitch : Pitch.PitchTraits) goal ball =
         else
             TypedVector3.Zero
 
+    let insideGoal =
+        abs(relPos.X) < Ball.ballRadius + goalWidth / 2.0f &&
+        ball.pos.Z < Ball.ballRadius + goalHeight &&
+        match goal with
+        | UpperGoal -> ball.pos.Y > pitch.length / 2.0f
+        | LowerGoal -> ball.pos.Y < -pitch.length / 2.0f
+
     let collideWithNetBack =
-        if abs(relPos.X) < goalWidth / 2.0f &&
-           ball.pos.Z < goalHeight then
+        if insideGoal then
             let dist =
                 match goal with
                 | UpperGoal ->
@@ -216,12 +227,21 @@ let collideGoalWithBall (pitch : Pitch.PitchTraits) goal ball =
                 | LowerGoal ->
                     goalCenter.Y - goalNetDepth - ball.pos.Y
 
-            if abs dist < 0.5f<m> then
-                let normalY =
-                    match goal with
-                    | UpperGoal -> -1.0f
-                    | LowerGoal -> 1.0f
-                let normal = TypedVector3<1>(0.0f, normalY, 0.0f)
+            if abs dist < Ball.ballRadius then
+                let normal = TypedVector3<1>(0.0f, 1.0f, 0.0f)
+                collideLightWithHeavy goalNetRestitution normal ball.speed
+            else
+                TypedVector3.Zero
+        else
+            TypedVector3.Zero
+
+    let collideWithNetSides =
+        if insideGoal then
+            let dist =
+                min (abs(relPos.X + goalWidth / 2.0f)) (abs(goalWidth / 2.0f - relPos.X))
+
+            if dist < Ball.ballRadius then
+                let normal = TypedVector3<1>(1.0f, 0.0f, 0.0f)
                 collideLightWithHeavy goalNetRestitution normal ball.speed
             else
                 TypedVector3.Zero
@@ -231,7 +251,8 @@ let collideGoalWithBall (pitch : Pitch.PitchTraits) goal ball =
     collideWithPost (-goalWidth / 2.0f) +
     collideWithPost (goalWidth / 2.0f) +
     collideWithBar +
-    collideWithNetBack
+    collideWithNetBack +
+    collideWithNetSides
 
 let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
 let airDrag = 0.5f</s>
