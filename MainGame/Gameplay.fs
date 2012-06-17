@@ -252,40 +252,25 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
         scheduler.RunFor (float32 dt)
 
         let pad = Input.GamePad.GetState(playerIndex)
-        let humanControledPlayerState =
-            match playerControlled.Value with
-            | Some(playerSide, idx) ->
-                let player =
-                    match playerSide with
-                    | Team.TeamA -> state.Value.teamA.onPitch.[idx]
-                    | Team.TeamB -> state.Value.teamB.onPitch.[idx]
-
-                let hasBallControl =
-                    (player.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
-
-                Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) player
-                |> Some
-            | None ->
-                None
 
         let updateTeam side =
             match side with
             | Team.TeamA -> state.Value.teamA.onPitch
             | Team.TeamB -> state.Value.teamB.onPitch
-            |> Array.mapi (fun i playerState ->
-                match playerControlled.Value with
-                | Some (team, idx) when team = side && idx = i ->
-                    humanControledPlayerState.Value
-                | _ ->
-                    playerState
+            |> Array.map (fun playerState ->
+                playerState
                 |> Player.updateKeyFrame dt
                 |> Player.updatePlayer dt)
             |> Array.mapi (fun i playerState ->
                 match playerControlled.Value with
                 | Some (team, idx) when team = side && idx = i ->
-                    playerState
+                    // Human-controlled
+                    let hasBallControl =
+                        (playerState.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
+                    Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) playerState
                 | Some _
                 | None ->
+                    // AI-controlled
                     let objectives =
                         match side with
                         | Team.TeamA -> teamAObjectives.Value
