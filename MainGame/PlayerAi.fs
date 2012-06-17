@@ -195,6 +195,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     // Notify the keeper task to stop issuing objectives to the keeper
     let keeperControl = env.NewChannel<unit option>()
+    let grabKeeper = task { return! keeperControl.Send(None) }
+    let releaseKeeper = task { return! keeperControl.Send(Some()) }
     let keeper killed =
         let ballInBox() =
             let state = getMatchState()
@@ -264,7 +266,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             let team = getTeam()
 
             let formation =
-                Tactics.tactics Tactics.formation442 side (getMatchState())
+                Tactics.getPlayFormation Tactics.formation442 side (getMatchState())
                 |> List.map getAbsPos
                 |> Array.ofList
 
@@ -310,10 +312,10 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             | 0, _
             | _, Some(0,_) ->
                 // Pause
-                do! keeperControl.Send(None)
+                do! grabKeeper
             | _ ->
                 // Activate
-                do! keeperControl.Send(Some())
+                do! releaseKeeper
 
             match backup with
             | Some (backup, pos) ->
@@ -465,9 +467,9 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             | _ -> return ()
         }
 
-    let orderFormation() =
+    let orderFormation situationFun =
         let formation =
-            Tactics.tactics Tactics.formation442 side (getMatchState())
+            situationFun Tactics.formation442 side (getMatchState())
             |> List.map getAbsPos
             |> Array.ofList
 
@@ -485,18 +487,20 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 
     let defendCorner =
         task {
+            do! grabKeeper
             let keeper = 0
             RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()) |> assign keeper
 
-            orderFormation()
+            orderFormation Tactics.getCornerDefenseFormation
 
             return! waitUntilBallInPlay
         }
 
     let kickCorner pitchSide =
         task {
+            do! grabKeeper
             let state = getMatchState()
-            orderFormation()
+            orderFormation Tactics.getCornerAttackFormation
             do! env.WaitNextFrame()
             do! waitTeamStill
             let x =
@@ -548,13 +552,15 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendThrowIn pitchSide y =
         task {
-            orderFormation()
+            do! grabKeeper
+            orderFormation (Tactics.getThrowInFormation pitchSide y)
             return! waitUntilBallInPlay
         }
 
     let throwIn pitchSide y =
         task {
-            orderFormation()
+            do! grabKeeper
+            orderFormation (Tactics.getThrowInFormation pitchSide y)
             do! env.WaitNextFrame()
             do! waitTeamStill
 
@@ -616,6 +622,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let kickIn pitchSide =
         task {
+            do! grabKeeper
             let state = getMatchState()
             let y =
                 if attackUp() then
@@ -630,7 +637,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             let keeper = 0
             RunningTo (TypedVector2<m>(x, y), absUp()) |> assign keeper
 
-            orderFormation()
+            orderFormation Tactics.getKickInFormation
             do! env.WaitNextFrame()
             do! waitTeamStill
 
@@ -643,7 +650,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendKickIn =
         task {
-            orderFormation()
+            do! grabKeeper
+            orderFormation Tactics.getKickInFormation
             return! waitUntilBallInPlay
         }
         
@@ -839,6 +847,8 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
     | RunningWithBallTo target, Player.Standing ->
         runWithBallTo target
 
+    | CrossingTo _, Player.Trapping
+    | PassingTo _, Player.Trapping
     | ShootingAtGoal _, Player.Trapping
     | RunningWithBallTo _, Player.Trapping ->
         { playerState with activity = Player.Passing }

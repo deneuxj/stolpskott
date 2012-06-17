@@ -39,113 +39,78 @@ let formation442 =
     ]
     |> List.map (fun (x, y) -> { x = x; y = y })
 
-let tactics formation side (game : Match.MatchState) =
-    let getRelPos = getRelPos game.pitch (Match.isTeamAttackingUp side game.period)
-    let ballPos = TypedVector2(game.ball.pos.X, game.ball.pos.Y) |> getRelPos
-    let isDefending = 
-        match side, game.ball.inPlay with
-        | Team.TeamA, Ball.DeadBall (Team.TeamB)
-        | Team.TeamB, Ball.DeadBall (Team.TeamA)
-        | _, Ball.InPlay when ballPos.y < 0.0f -> true
-        | _ -> false
+let getThrowInFormation side y formation team (game : Match.MatchState) =    
+    let x =
+        match side with
+        | Ball.Left -> -game.pitch.length / 2.0f
+        | Ball.Right -> game.pitch.length / 2.0f
 
-    let (|LeftCorridor|CenterCorridor|RightCorridor|) ballPos =
-        if ballPos.x < -0.33f then LeftCorridor
-        elif ballPos.x > 0.33f then RightCorridor
-        else CenterCorridor
-
-    let tx, sx = 
-        // Horizontal spread factor: tight when defending.
-        let sx_factor =
-            if isDefending then 0.5f else 0.8f
-
-        // Limit spread to avoid having players fall off the pitch
-        let max_sx =
-            match ballPos with
-            | LeftCorridor | RightCorridor -> 0.66f
-            | CenterCorridor -> 1.0f
-
-        let tx =
-            match ballPos with
-            | LeftCorridor -> -0.33f
-            | RightCorridor -> 0.33f
-            | CenterCorridor -> 0.0f
-
-        tx, sx_factor * max_sx
-
-    let ty, sy =
-        match side, game.ball.inPlay with
-        | _, Ball.LiveBall ->
-            let baseY =
-                // defending close to our goal. Back line in line with the ball
-                if ballPos.y < -0.5f then ballPos.y
-                // defensive midfield play. Back line is fixed.
-                elif ballPos.y < 0.0f then -0.5f
-                // offensive midfield play. Back line moves up to the middle.
-                elif ballPos.y < 0.5f then ballPos.y - 0.5f
-                // offensive play, close to the opponent's goal. Back line stays on the middle line.
-                else 0.0f
-
-            let topY =
-                // Attackers follow the opponent's back line.
-                let opponents =
-                    match side with
-                    | Team.TeamA -> game.teamB
-                    | Team.TeamB -> game.teamA
-                let p0, p1 =
-                    opponents.onPitch
-                    |> SeqUtil.minBy2 (fun player -> player.pos |> getRelPos |> fun { y = y } -> -y)
-
-                if p1 > 0 then
-                    opponents.onPitch.[p1].pos |> getRelPos |> fun { y = y } -> y
-                elif p0 > 0 then
-                    opponents.onPitch.[p0].pos |> getRelPos |> fun { y = y } -> y
-                else 1.0f
-            (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
-
-        // Trapped by own keeper
-        | Team.TeamA, Ball.TrappedByKeeper Team.TeamA
-        | Team.TeamB, Ball.TrappedByKeeper Team.TeamB ->
-            0.0f, 0.5f
-
-        // Trapped by the opponent's keeper
-        | Team.TeamA, Ball.TrappedByKeeper Team.TeamB
-        | Team.TeamB, Ball.TrappedByKeeper Team.TeamA ->
-            0.0f, 0.5f
-
-        // Kick-in, our team.
-        | Team.TeamA, Ball.KickIn(Team.TeamA, _)
-        | Team.TeamB, Ball.KickIn(Team.TeamB, _) ->
-            0.0f, 0.5f
-
-        // Kick-in, opponents.
-        | Team.TeamA, Ball.KickIn(Team.TeamB, _)
-        | Team.TeamB, Ball.KickIn(Team.TeamA, _) ->
-            0.0f, 0.6f
-
-        // Dead ball, our team.
-        | Team.TeamA, Ball.DeadBall (Team.TeamA)
-        | Team.TeamB, Ball.DeadBall (Team.TeamB) ->
-            let baseY, topY =
-                // Free kick, penalty or corner in the opponent's side
-                if ballPos.y > 0.0f then
-                    0.0f, 0.9f
-                else // from within our side.
-                    ballPos.y, ballPos.y + 0.9f
-            (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
-
-        // Dead ball, opponents
-        | Team.TeamB, Ball.DeadBall (Team.TeamA)
-        | Team.TeamA, Ball.DeadBall (Team.TeamB) ->
-            let baseY, topY =
-                // Corner or free kick close to the line
-                if ballPos.y < 0.1f then
-                    0.0f, 1.0f
-                elif ballPos.y < 0.0f then
-                    0.1f, 1.0f
-                else
-                    ballPos.y - 0.9f, ballPos.y
-            (baseY + topY) / 2.0f, (topY - baseY) / 2.0f
+    let relPos = getRelPos game.pitch (Match.isTeamAttackingUp team game.period) (TypedVector2<m>(x, y))
+    let baseY = max -1.0f (relPos.y - 0.5f)
+    let topY = max 1.0f (relPos.y + 0.5f)
+    let sy = (topY - baseY) / 2.0f
+    let ty = (topY + baseY) / 2.0f
+    let sx = 0.5f
+    let tx =
+        if relPos.x > 0.0f then
+            0.5f
+        else
+            -0.5f
 
     formation
-    |> List.map (fun { x = x; y = y } -> { x = tx + sx * x; y = ty + sy * y })
+    |> List.map (transform sx sy tx ty)
+
+let getCornerDefenseFormation formation team (game : Match.MatchState) =
+    let sx = 0.5f
+    let tx = 0.5f
+    let sy = 0.5f
+    let ty = -0.5f
+    
+    formation
+    |> List.map (transform sx sy tx ty)
+
+let getCornerAttackFormation formation team (game : Match.MatchState) =
+    let sx = 0.5f
+    let tx = 0.5f
+    let sy = 0.5f
+    let ty = 0.5f
+    
+    formation
+    |> List.map (transform sx sy tx ty)
+
+let getPlayFormation formation team (game : Match.MatchState) =
+    let isAttackingUp = Match.isTeamAttackingUp team game.period
+    let ballPos2 = TypedVector2<m>(game.ball.pos.X, game.ball.pos.Y)
+    let ballRelPos = ballPos2 |> getRelPos game.pitch isAttackingUp
+
+    let baseY, topY =
+        if ballRelPos.y < -0.8f then
+            ballRelPos.y, 0.0f
+        elif ballRelPos.y < 0.5f then
+            max (ballRelPos.y - 0.5f) -0.8f, min (ballRelPos.y + 0.5f) 0.5f
+        else
+            0.0f, ballRelPos.y
+    
+    let sx = 0.5f
+    let tx =
+        if ballRelPos.x < -0.33f then
+            -sx
+        elif ballRelPos.x > 0.33f then
+            sx
+        else
+            0.0f
+
+    let sy = (topY - baseY) / 2.0f
+    let ty = (topY + baseY) / 2.0f
+
+    formation
+    |> List.map (transform sx sy tx ty)
+
+let getKickInFormation formation team (game : Match.MatchState) =
+    let sx = 0.5f
+    let tx = 0.5f
+    let sy = 0.5f
+    let ty = 0.0f
+    
+    formation
+    |> List.map (transform sx sy tx ty)
