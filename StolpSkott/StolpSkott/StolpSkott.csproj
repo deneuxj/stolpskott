@@ -121,6 +121,10 @@
       <Project>{7BDE5138-FF45-40C3-AD86-7C614B7AD779}</Project>
       <Name>CoopMultiTasking</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\..\xnautils\XNAUtils\XNAUtils.fsproj">
+      <Project>{EBFAB7EB-FF0B-4DE3-842B-BAB06DCD3D42}</Project>
+      <Name>XNAUtils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\MainGame\MainGame.fsproj">
       <Project>{04725FD0-286A-4FF8-8A64-5E3191A9B88E}</Project>
       <Name>MainGame</Name>
