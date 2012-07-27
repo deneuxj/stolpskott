@@ -8,6 +8,62 @@ open CleverRake.XnaUtils
 
 open Ball
 
+
+type Sphere = Sphere of TypedVector3<m> * float32<m> * TypedVector3<m/s>
+type Rectangle = Rectangle of TypedVector3<m> * float32<m> * float32<m> * TypedVector3<1> * TypedVector3<m/s>
+type Cylinder = Cylinder of TypedVector3<m> * float32<m> * float32<m> * TypedVector3<1> * TypedVector3<m/s>
+
+
+let checkCollisionCylinderVsSphere
+    (Cylinder(pos1, radius1, length, axis, vel1))
+    (Sphere(pos2, radius2, vel2)) =
+
+    let axis = length * axis
+    let cast (x : float32<'M>) = LanguagePrimitives.FloatWithMeasure<'M> (float x)
+    let tup (v : TypedVector3<'M>) = (cast v.X, cast v.Y, cast v.Z)
+    match Collisions.CylinderSphere.computeCollisionTimes
+            (tup pos1)
+            (tup axis)
+            (cast radius1)
+            (tup vel1)
+            (tup pos2)
+            (cast radius2)
+            (tup vel2) with
+    | [] -> None
+    | t :: _ -> Some (1.0f<s> * float32 t)
+
+
+let checkCollisionRectangleVsSphere
+    (Rectangle(pos1, width, length, normal, vel1))
+    (Sphere(pos2, radius, vel2)) =
+
+    let relSpeed = vel2 - vel1
+    let relPos = pos2 - pos1
+    let pn = TypedVector.dot3(relPos, normal)
+    let v = relSpeed
+    let vn = TypedVector.dot3(v, normal)
+    let t = (radius - pn ) / vn
+    if t >= 0.0f<s> then
+        let relPos' = pos2 + t * vel2 - pos1
+        let up, right =
+            let up = TypedVector3<1>(Vector3.UnitY)
+            let right = TypedVector.cross3(up, normal)
+            match TypedVector.tryNormalize3 right with
+            | Some r -> TypedVector.cross3(normal, r), r
+            | None ->
+                let right = TypedVector3<1>(Vector3.UnitX)
+                let up = TypedVector.cross3(normal, right) |> TypedVector.normalize3
+                up, TypedVector.cross3(up, normal)
+        let x = TypedVector.dot3(relPos', right)
+        let y = TypedVector.dot3(relPos', up)
+        if abs x < width && abs y < length then
+            Some t
+        else
+            None
+    else
+        None
+
+
 // Collision of a light moving object with a heavy object
 // normal: Normal to the surface of the heavy object
 // speed: Speed of the moving object relative to the heavy object
@@ -61,7 +117,7 @@ let makeKick (kickElevation : float32<1>) (kickSpeed : float32<m/s>) (ballContro
     let dir = TypedVector3<1>(direction.X, direction.Y, kickHeight) |> TypedVector.normalize3
     kickSpeed * dir
 
-let collideBallWithPlayer (playerId, player : Player.State) ball =
+let collideBallWithPlayer dt (playerId, player : Player.State) ball =
     let ballSpeed2d = TypedVector2<m/s>(ball.speed.X, ball.speed.Y)
     let ballPos2d = TypedVector2<m>(ball.pos.X, ball.pos.Y)
 
@@ -138,25 +194,41 @@ let collideBallWithPlayer (playerId, player : Player.State) ball =
                 Free
 
         | Player.Standing _ ->
-            let canControl = true
-                //player.speed > 0.0f<m/s> &&
-                //TypedVector.dot2(player.direction, relPos) > 0.0f<m> &&
-                //relSpeed.Length < maxBallControlSpeed * MathHelper.Lerp(0.8f, 1.0f, player.traits.ballControl)
+            // Picture the player pushing a rake in from of him.
+            // The ball is pushed if the ball hits the rake.
+            let rakeCollision =
+                let rake =
+                    let dir = vector3Of2 player.direction
+                    let rakeWidth = 1.0f<m>
+                    let rakeHeight = 1.0f<m>
+                    let rakePos =
+                        TypedVector3<m>(0.0f<m>, 0.0f<m>, rakeHeight / 2.0f) +
+                        pushedDistance * dir +
+                        vector3Of2 player.pos
+                    Rectangle(rakePos,
+                              rakeWidth,
+                              rakeHeight,
+                              dir,
+                              player.speed * dir)
+                let sphere =
+                    Sphere(ball.pos, ballRadius, ball.speed)
+                checkCollisionRectangleVsSphere rake sphere
 
-            if canControl && isBallGoingTowardsPlayer && dist < pushedDistance then
+            match rakeCollision with
+            | Some x when x < dt ->
                 let factor = MathHelper.Lerp(maxPushSpeedFactor, minPushSpeedFactor, player.traits.ballControl)
                 Pushed(playerId, player.speed * factor * (vector3Of2 player.direction))
-            else
+            | _ ->
                 Free
     else
         Free
 
 
-let collidePlayersWithBall ball players =
+let collidePlayersWithBall dt ball players =
     let impulse =
         players
         |> Seq.fold (fun impulse player ->
-            match impulse, collideBallWithPlayer player ball with
+            match impulse, collideBallWithPlayer dt player ball with
             // Free is the neutral element of impulse combination.
             | Free, impulse
             | impulse, Free -> impulse
@@ -177,88 +249,81 @@ let goalPostRestitution = 2.0f
 let goalNetDepth = 1.3f<m>
 let goalNetRestitution = 1.2f
 
-let collideGoalWithBall (pitch : Pitch.PitchTraits) goal ball =
+let collideGoalPostsWithBall dt (pitch : Pitch.PitchTraits) goal ball =
+    let sphere = Sphere(ball.pos, ballRadius, ball.speed)
     let goalCenter =
         let y = pitch.length * match goal with UpperGoal -> 0.5f | LowerGoal -> -0.5f
         TypedVector2<m>(0.0f<m>, y)
-        
-    let relPos = ball.pos - TypedVector3<m>(goalCenter.X, goalCenter.Y, 0.0f<_>)
 
-    let collideWithPost x =
-        let postRelPos = relPos - TypedVector3<m>(x, 0.0f<_>, 0.0f<_>)
-        let dist = postRelPos.Length
-        let normal = (1.0f / dist) * postRelPos
-        let collides =
-            dist < Ball.ballRadius + goalPostRadius &&
-            ball.pos.Z < goalHeight
+    let crossBar = Cylinder(
+                    TypedVector3(goalCenter.X - goalWidth/2.0f, goalCenter.Y, goalHeight),
+                    goalPostRadius,
+                    goalWidth,
+                    TypedVector3(1.0f, 0.0f, 0.0f),
+                    TypedVector3.Zero)
+    let leftPost = Cylinder(
+                    TypedVector3(goalCenter.X - goalWidth/2.0f, goalCenter.Y, 0.0f<m>),
+                    goalPostRadius,
+                    goalHeight,
+                    TypedVector3(0.0f, 0.0f, 1.0f),
+                    TypedVector3.Zero)
+    let rightPost = Cylinder(
+                        TypedVector3(goalCenter.X + goalWidth/2.0f, goalCenter.Y, 0.0f<m>),
+                        goalPostRadius,
+                        goalHeight,
+                        TypedVector3(0.0f, 0.0f, 1.0f),
+                        TypedVector3.Zero)
 
-        if collides then
+    let impulseCrossBar =
+        match checkCollisionCylinderVsSphere crossBar sphere with
+        | Some s when s < dt ->
+            let normal =
+                TypedVector3(
+                    0.0f<m>,
+                    goalCenter.Y - ball.pos.Y,
+                    goalHeight - ball.pos.Z
+                )
+                |> TypedVector.normalize3
             collideLightWithHeavy goalPostRestitution normal ball.speed
-        else
+        | _ ->
             TypedVector3.Zero
 
-    let collideWithBar =
-        let postRelPos = TypedVector3<m>(0.0f<m>, ball.pos.Y, ball.pos.Z) - TypedVector3<m>(0.0f<m>, goalCenter.Y, goalHeight)
-        let dist = postRelPos.Length
-        let normal = (1.0f / dist) * postRelPos
-
-        let collides =
-            dist < Ball.ballRadius + goalPostRadius &&
-            abs(relPos.X) < goalWidth / 2.0f
-
-        if collides then
+    let impulseLeftPost =
+        match checkCollisionCylinderVsSphere leftPost sphere with
+        | Some s when s < dt ->
+            let normal =
+                TypedVector3(
+                    goalCenter.X - goalWidth / 2.0f - ball.pos.X,
+                    goalCenter.Y - ball.pos.Y,
+                    0.0f<m>
+                )
+                |> TypedVector.normalize3
             collideLightWithHeavy goalPostRestitution normal ball.speed
-        else
+        | _ ->
             TypedVector3.Zero
 
-    let insideGoal =
-        abs(relPos.X) < Ball.ballRadius + goalWidth / 2.0f &&
-        ball.pos.Z < Ball.ballRadius + goalHeight &&
-        match goal with
-        | UpperGoal -> ball.pos.Y > pitch.length / 2.0f
-        | LowerGoal -> ball.pos.Y < -pitch.length / 2.0f
-
-    let collideWithNetBack =
-        if insideGoal then
-            let dist =
-                match goal with
-                | UpperGoal ->
-                    goalCenter.Y + goalNetDepth - ball.pos.Y
-                | LowerGoal ->
-                    goalCenter.Y - goalNetDepth - ball.pos.Y
-
-            if abs dist < Ball.ballRadius then
-                let normal = TypedVector3<1>(0.0f, 1.0f, 0.0f)
-                collideLightWithHeavy goalNetRestitution normal ball.speed
-            else
-                TypedVector3.Zero
-        else
+    let impulseRightPost =
+        match checkCollisionCylinderVsSphere leftPost sphere with
+        | Some s when s < dt ->
+            let normal =
+                TypedVector3(
+                    goalCenter.X + goalWidth / 2.0f - ball.pos.X,
+                    goalCenter.Y - ball.pos.Y,
+                    0.0f<m>
+                )
+                |> TypedVector.normalize3
+            collideLightWithHeavy goalPostRestitution normal ball.speed
+        | _ ->
             TypedVector3.Zero
 
-    let collideWithNetSides =
-        if insideGoal then
-            let dist =
-                min (abs(relPos.X + goalWidth / 2.0f)) (abs(goalWidth / 2.0f - relPos.X))
+    impulseCrossBar + impulseLeftPost + impulseRightPost
 
-            if dist < Ball.ballRadius then
-                let normal = TypedVector3<1>(1.0f, 0.0f, 0.0f)
-                collideLightWithHeavy goalNetRestitution normal ball.speed
-            else
-                TypedVector3.Zero
-        else
-            TypedVector3.Zero
-           
-    collideWithPost (-goalWidth / 2.0f) +
-    collideWithPost (goalWidth / 2.0f) +
-    collideWithBar +
-    collideWithNetBack +
-    collideWithNetSides
 
 let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
 let airDrag = 0.5f</s>
 
 let updateBall pitch (dt : float32<s>) players ball =
-    let impulse = collidePlayersWithBall ball players
+    let impulse = collidePlayersWithBall dt ball players
     
     let speed =
         match impulse with
@@ -301,6 +366,6 @@ let updateBall pitch (dt : float32<s>) players ball =
     // Bouncing against goal posts
     let goalImpulses =
         [ UpperGoal ; LowerGoal ]
-        |> Seq.sumBy (fun goal -> collideGoalWithBall pitch goal ball)
+        |> Seq.sumBy (fun goal -> collideGoalPostsWithBall dt pitch goal ball)
 
     { ball with speed = ball.speed + goalImpulses }, impulse
