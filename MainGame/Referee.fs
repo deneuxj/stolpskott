@@ -73,7 +73,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
             
             | InUpperGoal | InLowerGoal ->
                 let scoringTeam =
-                    if state.ball.pos.Y > 0.0f<m> && isTeamAttackingUp Team.TeamA state.period then
+                    if (state.ball.pos.Y > 0.0f<m>) = (isTeamAttackingUp Team.TeamA state.period) then
                         Team.TeamA
                     else
                         Team.TeamB
@@ -90,7 +90,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
 
             | OutUpper | OutLower ->
                 let homeTeam =
-                    if state.ball.pos.Y > 0.0f<m> && isTeamAttackingUp Team.TeamA state.period then
+                    if (state.ball.pos.Y > 0.0f<m>) = (isTeamAttackingUp Team.TeamA state.period) then
                         Team.TeamB
                     else
                         Team.TeamA
