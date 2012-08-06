@@ -15,7 +15,7 @@ type State =
 type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSide) =
     inherit DrawableGameComponent(game)
 
-    let textures : Rendering.Resources option ref = ref None
+    let rscs : Rendering.Resources option ref = ref None
     let spriteBatch : Graphics.SpriteBatch option ref = ref None
     let font : Graphics.SpriteFont option ref = ref None
 
@@ -222,7 +222,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
         |> scheduler.AddTask
 
     override this.LoadContent() =
-        textures :=
+        rscs :=
             Some {
                 grassLight = content.Load("grass-light")
                 grassDark = content.Load("grass-dark")
@@ -233,6 +233,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                 playerSprites = content.Load("player")
                 playerShadows = content.Load("player")
                 whiteLine = content.Load("white")
+                ballKick = content.Load("ball-kick")
             }
         spriteBatch :=
             Some (new Graphics.SpriteBatch(this.GraphicsDevice))
@@ -328,6 +329,12 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             ballKicked.Trigger(id)
         | _ -> ()
 
+        // Ball sounds
+        match impulse with
+        | Physics.BallImpulse.Trapped _
+        | Physics.BallImpulse.Free -> ()
+        | _ -> rscs.Value.Value.ballKick.Play() |> ignore
+
         let ballState =
             if Input.Keyboard.GetState().IsKeyDown(Input.Keys.Space) then
                 { ballState with
@@ -341,7 +348,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
         state := { state.Value with teamA = { state.Value.teamA with onPitch = teamA } ; teamB = { state.Value.teamB with onPitch = teamB } ; ball = ballState }
 
     override this.Draw(_) =
-        match spriteBatch.Value, textures.Value with
+        match spriteBatch.Value, rscs.Value with
         | Some spriteBatch, Some textures ->
             let teamA =
                 state.Value.teamA.onPitch

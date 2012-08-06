@@ -1,6 +1,7 @@
 ﻿module CleverRake.StolpSkott.Rendering
 
 open Microsoft.Xna.Framework.Graphics
+open Microsoft.Xna.Framework.Audio
 open Microsoft.Xna.Framework
 open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils
@@ -19,6 +20,7 @@ type Resources =
         playerSprites : Texture2D
         playerShadows : Texture2D
         whiteLine : Texture2D
+        ballKick : SoundEffect
     }
 
 let ratio = 2048.0f<px> / 80.0f<m>
