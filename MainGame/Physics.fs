@@ -92,8 +92,8 @@ let (|SomeImpulse|_|) =
     | Trapped _ -> Some TypedVector3<m/s>.Zero
     | Free -> None
 
-let controlMaxDistance = 0.5f<m> // Beyond this distance, players can't trap the ball
-let kickMaxDistance = 0.8f<m> // Distance from the ball within which a player can kick it.
+let controlMaxDistance = 1.0f<m> // Beyond this distance, players can't trap the ball
+let kickMaxDistance = 1.6f<m> // Distance from the ball within which a player can kick it.
 let pushedDistance = 0.3f<m> // Distance before the ball is pushed by a player.
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
@@ -137,7 +137,7 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
 
         match player.activity with
         | Player.Trapping ->
-            if dist < 2.0f * controlMaxDistance then
+            if dist < controlMaxDistance then
                 Trapped(playerId)
             else
                 Free
