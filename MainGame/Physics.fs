@@ -249,6 +249,65 @@ let goalPostRestitution = 2.0f
 let goalNetDepth = 1.3f<m>
 let goalNetRestitution = 1.2f
 
+let collideGoalNetWithBall dt (pitch : Pitch.PitchTraits) goal ball =
+    let sphere = Sphere(ball.pos, ballRadius, ball.speed)
+    let goalCenter =
+        let y = pitch.length * match goal with UpperGoal -> 0.5f | LowerGoal -> -0.5f
+        TypedVector2<m>(0.0f<m>, y)
+
+    let normal =
+        match goal with
+        | UpperGoal -> TypedVector3<1>(0.0f, -1.0f, 0.0f)
+        | LowerGoal -> TypedVector3<1>(0.0f, 1.0f, 0.0f)
+
+    let backNet =
+        Rectangle(
+            TypedVector3<m>(goalCenter.X, goalCenter.Y, goalHeight / 2.0f) - goalNetDepth * normal,
+            goalWidth / 2.0f,
+            goalHeight / 2.0f,
+            normal,
+            TypedVector3<m/s>.Zero)
+
+    let leftNet =
+        Rectangle(
+            TypedVector3<m>(goalCenter.X - goalWidth / 2.0f, goalCenter.Y, goalHeight / 2.0f) - goalNetDepth * normal,
+            goalNetDepth / 2.0f,
+            goalHeight / 2.0f,
+            TypedVector3<1>(1.0f, 0.0f, 0.0f),
+            TypedVector3<m/s>.Zero)
+
+    let rightNet =
+        Rectangle(
+            TypedVector3<m>(goalCenter.X + goalWidth / 2.0f, goalCenter.Y, goalHeight / 2.0f) - goalNetDepth * normal,
+            goalNetDepth / 2.0f,
+            goalHeight / 2.0f,
+            TypedVector3<1>(-1.0f, 0.0f, 0.0f),
+            TypedVector3<m/s>.Zero)
+
+    let topNet =
+        Rectangle(
+            TypedVector3<m>(goalCenter.X, goalCenter.Y, goalHeight) - goalNetDepth * normal,
+            goalWidth / 2.0f,
+            goalNetDepth / 2.0f,
+            TypedVector3<1>(0.0f, 0.0f, -1.0f),
+            TypedVector3<m/s>.Zero)
+
+    let computeImpulse (rect, normal) =
+        match checkCollisionRectangleVsSphere rect sphere with
+        | Some s when s < dt ->
+            collideLightWithHeavy goalNetRestitution normal ball.speed
+        | _ ->
+            TypedVector3<m/s>.Zero
+
+    [|
+        (backNet, normal)
+        (leftNet, TypedVector3<1>(1.0f, 0.0f, 0.0f))
+        (rightNet, TypedVector3<1>(-1.0f, 0.0f, 0.0f))
+        (topNet, TypedVector3<1>(0.0f, 0.0f, -1.0f))
+    |]
+    |> Array.fold (fun impulse net -> let imp = computeImpulse net in imp + impulse) TypedVector3<m/s>.Zero
+
+
 let collideGoalPostsWithBall dt (pitch : Pitch.PitchTraits) goal ball =
     let sphere = Sphere(ball.pos, ballRadius, ball.speed)
     let goalCenter =
@@ -363,9 +422,9 @@ let updateBall pitch (dt : float32<s>) players ball =
             pos = TypedVector3(pos.X, pos.Y, posZ)
             speed = TypedVector3(speed.X, speed.Y, speedZ) - dt * dragAccel }
 
-    // Bouncing against goal posts
+    // Bouncing against goal posts and net
     let goalImpulses =
         [ UpperGoal ; LowerGoal ]
-        |> Seq.sumBy (fun goal -> collideGoalPostsWithBall dt pitch goal ball)
+        |> Seq.sumBy (fun goal -> collideGoalPostsWithBall dt pitch goal ball + collideGoalNetWithBall dt pitch goal ball)
 
     { ball with speed = ball.speed + goalImpulses }, impulse
