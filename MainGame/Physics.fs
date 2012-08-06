@@ -173,16 +173,31 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
             else
                 Free
 
-        | Player.Stumbling _                
-        | Player.Tackling _ ->
-            let f =
-                match player.activity with
-                | Player.Tackling _ -> 2.0f
-                | _ -> 1.0f
-
-            if isBallGoingTowardsPlayer && dist < f * controlMaxDistance then
+        | Player.Stumbling _ ->
+            if isBallGoingTowardsPlayer && dist < controlMaxDistance then
                 BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
             else
+                Free
+
+        | Player.Tackling _ ->
+            let longRect =
+                let dir = vector3Of2 player.direction
+                let N = TypedVector3<1>(dir.Y, -dir.X, 0.0f)
+                let length = 2.0f<m>
+                let width = 1.0f<m>
+                Rectangle(
+                    vector3Of2 player.pos + TypedVector3<m>(0.0f<m>, 0.0f<m>, width / 2.0f),
+                    length,
+                    width,
+                    N,
+                    vector3Of2 (player.speed * player.direction))
+
+            let sphere = Sphere(ball.pos, ballRadius, ball.speed)
+
+            match checkCollisionRectangleVsSphere longRect sphere with
+            | Some t when t < dt ->
+                BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
+            | _ ->
                 Free
 
         | Player.KeeperDive keyframe ->
