@@ -119,29 +119,7 @@ let renderGrass (sb : SpriteBatch) (viewWidth : float32<m>, viewHeight : float32
         sb.Draw((if stripIsDark then darkGrass else lightGrass), Vector2(x / 1.0f<px>, y / 1.0f<px>), Color.White))
 
 
-let renderLines
-    (sb : SpriteBatch)
-    (viewWidth : float32<m>, viewHeight : float32<m>)
-    (whiteLine : Texture2D)
-    (pitch : Pitch.PitchTraits)
-    (viewX : float32<m>, viewY : float32<m>) =
-
-    let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
-    let lineHalfWidth = 0.5f * 0.14f<m>
-    let brightness = 0.9f
-    let color = new Color(brightness, brightness, brightness, 0.5f)
-    let drawHLine (x0, y0) (x1) =
-        let x0, x1 = min x0 x1, max x0 x1
-        let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
-        let x1', y1' = worldToScreen (x1 + lineHalfWidth, y0 + lineHalfWidth)
-        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), color)
-
-    let drawVLine (x0, y0) (y1) =
-        let y0, y1 = min y0 y1, max y0 y1
-        let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
-        let x1', y1' = worldToScreen (x0 + lineHalfWidth, y1 + lineHalfWidth)
-        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), color)
-
+let renderPitchLines drawHLine drawVLine (pitch : Pitch.PitchTraits) =
     // Outer lines, middle line.
     let x0 = -pitch.width / 2.0f
     let x1 = -x0
@@ -192,6 +170,76 @@ let renderLines
     drawVLine (x0, y0) y1
     drawVLine (x1, y0) y1
     drawHLine (x0, y1) x1
+
+
+let renderLines
+    (sb : SpriteBatch)
+    (viewWidth : float32<m>, viewHeight : float32<m>)
+    (whiteLine : Texture2D)
+    (pitch : Pitch.PitchTraits)
+    (viewX : float32<m>, viewY : float32<m>) =
+
+    let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
+    let lineHalfWidth = 0.5f * 0.14f<m>
+    let brightness = 0.9f
+    let color = new Color(brightness, brightness, brightness, 0.5f)
+    let drawHLine (x0, y0) (x1) =
+        let x0, x1 = min x0 x1, max x0 x1
+        let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
+        let x1', y1' = worldToScreen (x1 + lineHalfWidth, y0 + lineHalfWidth)
+        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), color)
+
+    let drawVLine (x0, y0) (y1) =
+        let y0, y1 = min y0 y1, max y0 y1
+        let x0', y0' = worldToScreen (x0 - lineHalfWidth, y0 - lineHalfWidth)
+        let x1', y1' = worldToScreen (x0 + lineHalfWidth, y1 + lineHalfWidth)
+        sb.Draw(whiteLine, Rectangle(int x0', int y1', int (x1' - x0'), int (y0' - y1')), color)
+
+    renderPitchLines drawHLine drawVLine pitch
+
+
+let renderRadar
+    (sb : SpriteBatch)
+    (radarX : float32<px>, radarY : float32<px>)
+    (radarWidth : float32<px>, radarHeight : float32<px>)
+    (whiteLine : Texture2D)
+    (pitch : Pitch.PitchTraits)
+    (teamA : TypedVector2<m>[])
+    (teamB : TypedVector2<m>[])
+    (ball : TypedVector3<m>) =
+
+    let worldToScreen (x, y) =
+        let x' = radarWidth * (1.0f + 2.0f * (x / pitch.width))
+        let y' = radarHeight * (1.0f - 2.0f * (y / pitch.length))
+        x', y'
+
+    let alpha = 1.0f
+    let color = new Color(0.0f, 0.0f, 0.0f, alpha)
+    let drawHLine (x0, y0) (x1) =
+        let x0, x1 = min x0 x1, max x0 x1
+        let x0', y' = worldToScreen (x0, y0)
+        let x1', _ = worldToScreen (x1, y0)
+        sb.Draw(whiteLine, Rectangle(int x0', int y', int (x1' - x0'), 1), color)
+
+    let drawVLine (x0, y0) (y1) =
+        let y0, y1 = min y0 y1, max y0 y1
+        let x', y0' = worldToScreen (x0, y0)
+        let _, y1' = worldToScreen (x0, y1)
+        sb.Draw(whiteLine, Rectangle(int x', int y1', 1, int (y0' - y1')), color)
+
+    renderPitchLines drawHLine drawVLine pitch
+
+    let renderTeam color (players : TypedVector2<m>[]) =
+        for pos in players do
+            let x', y' = worldToScreen (pos.X, pos.Y)
+            sb.Draw(whiteLine, Rectangle(int x' - 1, int y' - 1, 3, 3), color)
+
+    renderTeam (Color(0.0f, 0.0f, 1.0f, alpha)) teamA 
+    renderTeam (Color(1.0f, 0.0f, 0.0f, alpha)) teamB 
+
+    let x', y' = worldToScreen (ball.X, ball.Y)
+    sb.Draw(whiteLine, Rectangle(int x', int y', 2, 2), Color(1.0f, 1.0f, 1.0f, alpha))
+
 
 let sin45m = sin (0.5f * MathHelper.PiOver4)
 let sin45M = sin (1.5f * MathHelper.PiOver4)
@@ -310,6 +358,20 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
     
     let x, y = x + ballState.pos.X, y + ballState.pos.Y
 
+    let teamA =
+        allPlayers
+        |> Array.choose (
+            function
+            | (Team.TeamA, state : Player.State) -> Some (state.pos)
+            | _ -> None)
+
+    let teamB =
+        allPlayers
+        |> Array.choose (
+            function
+            | (Team.TeamB, state : Player.State) -> Some (state.pos)
+            | _ -> None)
+
     sb.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied)
     try
         renderGrass sb viewSize darkGrass lightGrass (x, y)
@@ -324,6 +386,11 @@ let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, lin
                yield Ball(ballState) |]
         Array.sortInPlaceWith (fun this other -> SpriteType.Compare(this, other)) sprites
         renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) sprites
+        let radarSize =
+            let s = 100.0f
+            (1.0f<px> * s, 1.0f<px> * s * pitch.length / pitch.width)
+        let radarPos = (1.0f<px> * float32 gd.Viewport.TitleSafeArea.Left, 1.0f<px> * float32 gd.Viewport.TitleSafeArea.Top)
+        renderRadar sb radarPos radarSize line pitch teamA teamB ballState.pos
     finally
         sb.End()
 
