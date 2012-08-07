@@ -16,6 +16,11 @@ type AiPlayerObjective =
     | ShootingAtGoal of TypedVector2<m>
 
 
+type KeeperControl =
+    | KeeperGrabbed
+    | KeeperReleased
+
+
 let assignObjectives (env : Environment) formation assign side (getMatchState : unit -> Match.MatchState) (kickerReady : Event<_>) =
     let getTeam() =
         match side with
@@ -194,9 +199,13 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
         }
 
     // Notify the keeper task to stop issuing objectives to the keeper
-    let keeperControl = env.NewChannel<unit option>()
-    let grabKeeper = task { return! keeperControl.Send(None) }
-    let releaseKeeper = task { return! keeperControl.Send(Some()) }
+    let keeperControl = env.NewChannel<KeeperControl>()
+    let grabKeeper order = task {
+        do! keeperControl.Send(KeeperGrabbed)
+        let keeper = 0 in order |> assign keeper
+        return ()
+    }
+    let releaseKeeper = task { return! keeperControl.Send(KeeperReleased) }
     let keeper killed =
         let ballInBox() =
             let state = getMatchState()
@@ -226,18 +235,18 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             task {
                 let! msg = keeperControl.Receive()
                 match msg with
-                | Some() -> return()
-                | None -> return! waitStart
+                | KeeperReleased -> return()
+                | KeeperGrabbed -> return! waitStart
             }
-        let rec shouldStop =
+        let shouldStop =
             task {
                 if keeperControl.IsEmpty() then
                     return false
                 else
                     let! msg = keeperControl.Receive()
                     match msg with
-                    | Some() -> return false
-                    | None -> return true
+                    | KeeperReleased -> return false
+                    | KeeperGrabbed -> return true
             }
         let rec controlKeeper killed =
             let keeper = 0
@@ -312,7 +321,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             | 0, _
             | _, Some(0,_) ->
                 // Pause
-                do! grabKeeper
+                do! grabKeeper FollowingTactic
             | _ ->
                 // Activate
                 do! releaseKeeper
@@ -487,9 +496,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 
     let defendCorner =
         task {
-            do! grabKeeper
-            let keeper = 0
-            RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()) |> assign keeper
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
 
             orderFormation Tactics.getCornerDefenseFormation
 
@@ -498,7 +505,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let kickCorner pitchSide =
         task {
-            do! grabKeeper
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -0.75f }, absUp()))
             let state = getMatchState()
             orderFormation Tactics.getCornerAttackFormation
             do! env.WaitNextFrame()
@@ -552,14 +559,14 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendThrowIn pitchSide y =
         task {
-            do! grabKeeper
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
             orderFormation (Tactics.getThrowInFormation pitchSide y)
             return! waitUntilBallInPlay
         }
 
     let throwIn pitchSide y =
         task {
-            do! grabKeeper
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
             orderFormation (Tactics.getThrowInFormation pitchSide y)
             do! env.WaitNextFrame()
             do! waitTeamStill
@@ -622,7 +629,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let kickIn pitchSide =
         task {
-            do! grabKeeper
             let state = getMatchState()
             let y =
                 if attackUp() then
@@ -634,14 +640,14 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 | Ball.Left -> -Pitch.goalBoxWidth / 2.0f
                 | Ball.Right -> Pitch.goalBoxWidth / 2.0f
 
-            let keeper = 0
-            RunningTo (TypedVector2<m>(x, y), absUp()) |> assign keeper
+            do! grabKeeper (RunningTo (TypedVector2<m>(x, y), absUp()))
 
             orderFormation Tactics.getKickInFormation
             do! env.WaitNextFrame()
             do! waitTeamStill
 
             kickerReady.Trigger()
+            let keeper = 0
             ShootingAtGoal (TypedVector2<m>.Zero) |> assign keeper
 
             let! _ = waitKick 1.0f<s> keeper
@@ -650,7 +656,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
     let defendKickIn =
         task {
-            do! grabKeeper
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
             orderFormation Tactics.getKickInFormation
             return! waitUntilBallInPlay
         }
