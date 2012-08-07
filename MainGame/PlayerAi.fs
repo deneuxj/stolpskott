@@ -688,7 +688,8 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     let loop =
         task {
             match getMatchState() with
-            | { period = Match.MatchOver } -> return ()
+            | { period = Match.MatchOver } ->
+                return ()
             | { ball = { inPlay = Ball.KickOff _ } } ->
                 printfn "%A: Prepare for kick off" side
                 return! prepareForKickOff
@@ -721,9 +722,14 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     task {
         let keeper = env.Spawn keeper
         let loop = env.SpawnRepeat loop
-        do! env.WaitUntil(fun () -> loop.IsDead)
+        do! env.WaitUntil <|
+            fun () ->
+                match getMatchState() with
+                | { period = Match.MatchOver } -> true
+                | _ -> false
+        loop.Kill()
         keeper.Kill()
-        do! env.WaitUntil(fun () -> keeper.IsDead)
+        do! env.WaitUntil(fun () -> keeper.IsDead && loop.IsDead)
     }
 
 
