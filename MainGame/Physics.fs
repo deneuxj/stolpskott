@@ -56,7 +56,7 @@ let checkCollisionRectangleVsSphere
                 up, TypedVector.cross3(up, normal)
         let x = TypedVector.dot3(relPos', right)
         let y = TypedVector.dot3(relPos', up)
-        if abs x < width && abs y < length then
+        if abs x < 0.5f * width && abs y < 0.5f * length then
             Some t
         else
             None
@@ -95,6 +95,8 @@ let (|SomeImpulse|_|) =
 let controlMaxDistance = 1.0f<m> // Beyond this distance, players can't trap the ball
 let kickMaxDistance = 1.6f<m> // Distance from the ball within which a player can kick it.
 let pushedDistance = 0.3f<m> // Distance before the ball is pushed by a player.
+let rakeWidth = 1.0f<m> // Width of the area ahead of the player to push the ball.
+let rakeHeight = 1.0f<m> // Height of the area ahead of the player to push the ball.
 let headerSpeed = 1.0f<m/s> // Speed modifier for headers
 let optimalKeeperKeyframe = 0.5f<kf> // The keyframe at which a keeper manages to catch the ball
 let keeperCaughtThreshold = 0.05f<kf> // Half-width of the interval in which keepers catch balls
@@ -260,9 +262,9 @@ type Goal = UpperGoal | LowerGoal
 let goalWidth = 7.32f<m>
 let goalHeight = 2.44f<m>
 let goalPostRadius = 0.07f<m>
-let goalPostRestitution = 2.0f
+let goalPostRestitution = 1.5f
 let goalNetDepth = 1.3f<m>
-let goalNetRestitution = 1.2f
+let goalNetRestitution = 1.05f
 
 let collideGoalNetWithBall dt (pitch : Pitch.PitchTraits) goal ball =
     let sphere = Sphere(ball.pos, ballRadius, ball.speed)
@@ -278,32 +280,32 @@ let collideGoalNetWithBall dt (pitch : Pitch.PitchTraits) goal ball =
     let backNet =
         Rectangle(
             TypedVector3<m>(goalCenter.X, goalCenter.Y, goalHeight / 2.0f) - goalNetDepth * normal,
-            goalWidth / 2.0f,
-            goalHeight / 2.0f,
+            goalWidth,
+            goalHeight,
             normal,
             TypedVector3<m/s>.Zero)
 
     let leftNet =
         Rectangle(
             TypedVector3<m>(goalCenter.X - goalWidth / 2.0f, goalCenter.Y, goalHeight / 2.0f) - goalNetDepth * normal,
-            goalNetDepth / 2.0f,
-            goalHeight / 2.0f,
+            goalNetDepth,
+            goalHeight,
             TypedVector3<1>(1.0f, 0.0f, 0.0f),
             TypedVector3<m/s>.Zero)
 
     let rightNet =
         Rectangle(
             TypedVector3<m>(goalCenter.X + goalWidth / 2.0f, goalCenter.Y, goalHeight / 2.0f) - goalNetDepth * normal,
-            goalNetDepth / 2.0f,
-            goalHeight / 2.0f,
+            goalNetDepth,
+            goalHeight,
             TypedVector3<1>(-1.0f, 0.0f, 0.0f),
             TypedVector3<m/s>.Zero)
 
     let topNet =
         Rectangle(
-            TypedVector3<m>(goalCenter.X, goalCenter.Y, goalHeight) - goalNetDepth * normal,
-            goalWidth / 2.0f,
-            goalNetDepth / 2.0f,
+            TypedVector3<m>(goalCenter.X, goalCenter.Y, goalHeight) - 0.5f * goalNetDepth * normal,
+            goalWidth,
+            goalNetDepth,
             TypedVector3<1>(0.0f, 0.0f, -1.0f),
             TypedVector3<m/s>.Zero)
 
