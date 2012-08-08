@@ -809,10 +809,9 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
     | RunningToBall, _ ->
         runToPos ballPos2
     | PassingTo other, Player.Standing ->
-        match distToBall playerState.pos with
-        | x when x < Physics.controlMaxDistance ->
+        if Physics.canTrap ball playerState then
             { playerState with activity = Player.Trapping }
-        | x ->
+        else
             runToPos ballPos2
     | PassingTo other, Player.Trapping ->
         let dir =

@@ -63,7 +63,34 @@ let checkCollisionRectangleVsSphere
     else
         None
 
+// Check if a point is located inside an arbitrary box
+type Box =
+    {
+        center : TypedVector3<m>
+        dir : TypedVector3<1>
+        width : float32<m>
+        length : float32<m>
+        height : float32<m>
+    }
 
+let isInsideBox (box : Box) (pos : TypedVector3<m>) =
+    let relPos = pos - box.center
+    let right, up =
+        match TypedVector.cross3(box.dir, TypedVector3<1>(Vector3.UnitZ)) |> TypedVector.tryNormalize3 with
+        | Some v -> v, TypedVector.cross3(v, box.dir)
+        | None ->
+            let up = TypedVector3<1>(Vector3.UnitX)
+            let v = TypedVector.cross3(box.dir, up) |> TypedVector.normalize3
+            v, TypedVector.cross3(v, box.dir)
+    let x = TypedVector.dot3(relPos, right)
+    let y = TypedVector.dot3(relPos, box.dir)
+    let z = TypedVector.dot3(relPos, up)
+
+    abs(x) < box.width / 2.0f &&
+    abs(y) < box.length / 2.0f &&
+    abs(z) < box.height / 2.0f
+
+    
 // Collision of a light moving object with a heavy object
 // normal: Normal to the surface of the heavy object
 // speed: Speed of the moving object relative to the heavy object
@@ -113,6 +140,58 @@ let softKickSpeed = 20.0f<m/s>
 let crossKickSpeed = 25.0f<m/s>
 let crossKickElevation = 0.3f
 
+let canPush (ball : Ball.State) (player : Player.State) =
+    let playerDir = vector3Of2 player.direction
+    TypedVector.dot3(ball.speed, playerDir) - player.speed <= 0.0f<m/s>
+    &&
+    let box =
+        {
+            center = TypedVector3<m>(player.pos.X, player.pos.Y, rakeHeight / 2.0f)
+            dir = playerDir
+            width = rakeWidth
+            length = pushedDistance
+            height = rakeHeight
+        }
+    isInsideBox box ball.pos    
+
+let canTrap (ball : Ball.State) (player : Player.State) =
+    let playerDir = vector3Of2 player.direction
+    let box =
+        {
+            center = TypedVector3<m>(player.pos.X, player.pos.Y, rakeHeight / 2.0f)
+            dir = playerDir
+            width = rakeWidth
+            length = controlMaxDistance
+            height = rakeHeight
+        }
+    isInsideBox box ball.pos
+
+let canKick (ball : Ball.State) (player : Player.State) =
+    let playerDir = vector3Of2 player.direction
+    let box =
+        {
+            center = TypedVector3<m>(player.pos.X, player.pos.Y, rakeHeight / 2.0f)
+            dir = playerDir
+            width = rakeWidth
+            length = kickMaxDistance
+            height = rakeHeight
+        }
+    isInsideBox box ball.pos
+
+let canTackle (ball : Ball.State) (player : Player.State) =
+    let playerDir = vector3Of2 player.direction
+    TypedVector.dot3(ball.speed, playerDir) - player.speed <= 0.0f<m/s>
+    &&
+    let box =
+        {
+            center = TypedVector3<m>(player.pos.X, player.pos.Y, rakeHeight / 2.0f)
+            dir = playerDir
+            width = rakeWidth
+            length = 2.0f<m>
+            height = rakeHeight
+        }
+    isInsideBox box ball.pos
+
 let makeKick (kickElevation : float32<1>) (kickSpeed : float32<m/s>) (ballControl : float32<bc>) (direction : TypedVector2<1>) =
     let kickHeight =
         kickElevation * MathHelper.Lerp(2.0f, 1.0f, ballControl)
@@ -139,20 +218,20 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
 
         match player.activity with
         | Player.Trapping ->
-            if dist < controlMaxDistance then
+            if canTrap ball player then
                 Trapped(playerId)
             else
                 Free
 
         | Player.Passing ->
-            if dist < controlMaxDistance then
+            if canKick ball player then
                 let kick = makeKick softKickElevation softKickSpeed player.traits.ballControl player.direction
                 Kicked(playerId, kick)
             else
                 Free
 
         | Player.Crossing ->
-            if dist < controlMaxDistance then
+            if canKick ball player then
                 let kick = makeKick crossKickElevation crossKickSpeed player.traits.ballControl player.direction
                 Kicked(playerId, kick)
             else
@@ -168,7 +247,7 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
                 Free
 
         | Player.Kicking (kf) ->
-            if isBallGoingTowardsPlayer && dist < kickMaxDistance then
+            if canKick ball player then
                 let controlModifier = MathHelper.Lerp(1.0f, 0.5f, (dist - pushedDistance) / (kickMaxDistance - pushedDistance))
                 let kick = makeKick hardKickElevation hardKickSpeed (controlModifier * player.traits.ballControl) player.direction
                 Kicked(playerId, kick)
@@ -182,24 +261,9 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
                 Free
 
         | Player.Tackling _ ->
-            let longRect =
-                let dir = vector3Of2 player.direction
-                let N = TypedVector3<1>(dir.Y, -dir.X, 0.0f)
-                let length = 2.0f<m>
-                let width = 1.0f<m>
-                Rectangle(
-                    vector3Of2 player.pos + TypedVector3<m>(0.0f<m>, 0.0f<m>, width / 2.0f),
-                    length,
-                    width,
-                    N,
-                    vector3Of2 (player.speed * player.direction))
-
-            let sphere = Sphere(ball.pos, ballRadius, ball.speed)
-
-            match checkCollisionRectangleVsSphere longRect sphere with
-            | Some t when t < dt ->
+            if canTackle ball player then
                 BouncedOffPlayer(playerId, collideLightWithHeavy playerTackleRestitution (1.0f / dist * vector3Of2 relPos) (vector3Of2 relSpeed))
-            | _ ->
+            else
                 Free
 
         | Player.KeeperDive keyframe ->
@@ -211,31 +275,10 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
                 Free
 
         | Player.Standing _ ->
-            // Picture the player pushing a rake in from of him.
-            // The ball is pushed if the ball hits the rake.
-            let rakeCollision =
-                let rake =
-                    let dir = vector3Of2 player.direction
-                    let rakeWidth = 1.0f<m>
-                    let rakeHeight = 1.0f<m>
-                    let rakePos =
-                        TypedVector3<m>(0.0f<m>, 0.0f<m>, rakeHeight / 2.0f) +
-                        pushedDistance * dir +
-                        vector3Of2 player.pos
-                    Rectangle(rakePos,
-                              rakeWidth,
-                              rakeHeight,
-                              dir,
-                              player.speed * dir)
-                let sphere =
-                    Sphere(ball.pos, ballRadius, ball.speed)
-                checkCollisionRectangleVsSphere rake sphere
-
-            match rakeCollision with
-            | Some x when x < dt ->
+            if canPush ball player then
                 let factor = MathHelper.Lerp(maxPushSpeedFactor, minPushSpeedFactor, player.traits.ballControl)
                 Pushed(playerId, player.speed * factor * (vector3Of2 player.direction))
-            | _ ->
+            else
                 Free
     else
         Free
