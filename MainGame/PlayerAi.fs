@@ -295,42 +295,14 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 else
                     RunningTo (getAbsPos { x = 0.0f ; y = -0.95f }, absUp()) |> assign i)
 
-            // If defending, order a backup player to run to where the ball will soon be
-            let backup =
-                if (ball.pos.Y < 0.0f<m>) = attackUp() then
-                    let delta = 1.0f<s>
-                    let futureBall =
-                        { ball with pos = ball.pos + delta * ball.speed }
-                    let backup, _ =                        
-                        team.onPitch
-                        |> Array.mapi (fun i player ->
-                            i,
-                            if i <> closestToBall then
-                                timeToBall futureBall player
-                            else 100.0f<s>)
-                        |> Array.minBy snd
-                    if backup <> closestToBall then
-                        Some (backup, futureBall.pos)
-                    else
-                        None
-                else
-                    None
-
             // Activate or pause the keeper task
-            match closestToBall, backup with
-            | 0, _
-            | _, Some(0,_) ->
+            match closestToBall with
+            | 0 ->
                 // Pause
-                do! grabKeeper FollowingTactic
+                do! grabKeeper RunningToBall
             | _ ->
                 // Activate
                 do! releaseKeeper
-
-            match backup with
-            | Some (backup, pos) ->
-                RunningTo (TypedVector2<m>(pos.X, pos.Y), absUp()) |> assign backup
-            | None ->
-                ()
 
             // Wait until the ball chaser has reached the ball, with a time limit.
             do! env.WaitUnless(
