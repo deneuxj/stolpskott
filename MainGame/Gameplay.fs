@@ -333,7 +333,13 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
         match impulse with
         | Physics.BallImpulse.Trapped _
         | Physics.BallImpulse.Free -> ()
-        | _ -> rscs.Value.Value.ballKick.Play() |> ignore
+
+        | Physics.BallImpulse.Bounced impulse
+        | Physics.BallImpulse.BouncedOffPlayer (_, impulse)
+        | Physics.BallImpulse.Pushed (_, impulse)
+        | Physics.BallImpulse.Kicked (_, impulse) ->
+            if impulse.Length > 0.5f<m/s> then
+                rscs.Value.Value.ballKick.Play() |> ignore
 
         let ballState =
             if Input.Keyboard.GetState().IsKeyDown(Input.Keys.Space) then
