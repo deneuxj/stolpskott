@@ -809,16 +809,15 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
         { playerState with activity = Player.Standing ; speed = 0.0f<m/s> }
     | ShootingAtGoal target, Player.Standing ->
         if TypedVector.dot2(target - playerState.pos, playerState.direction) > 0.0f<m> then 
-            match distToBall playerState.pos with
-            | x when x < Physics.pushedDistance ->
+            if Physics.canPush ball playerState then
                 runToPos (playerState.pos + ballPos2 - target)
-            | x when x < kickDistance ->
+            elif Physics.canKick ball playerState then
                 match target - playerState.pos |> TypedVector.tryNormalize2 with
                 | Some d ->
                     { playerState with activity = Player.Kicking 0.0f<kf> ; direction = d }
                 | None ->
                     { playerState with activity = Player.Kicking 0.0f<kf> }
-            | _ ->
+            else
                 runToPos ballPos2
         else
             runWithBallTo target
