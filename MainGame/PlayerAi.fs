@@ -768,23 +768,19 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
         match target - playerState.pos |> TypedVector.tryNormalize2 with
         | Some dir ->
             if TypedVector.dot2(ballPos2 - playerState.pos, dir) >= 0.0f<m> then
-                match distToBall playerState.pos with
-                | x when x > 2.0f * Physics.controlMaxDistance ->
+                if Physics.canPush ball playerState then
                     runToPos ballPos2
-                | x when x > (5.0f * Physics.pushedDistance + Physics.controlMaxDistance) / 6.0f ->
+                else
                     let relPos = ballPos2 - playerState.pos
                     let toBall = TypedVector.normalize2 relPos
                     let side = TypedVector2<1>(toBall.Y, -toBall.X)
                     let proj = TypedVector.dot2(dir, side)
                     let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
                     { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
-                | _ ->
-                    runToPos target
             else // Ball behind the player
-                match distToBall playerState.pos with
-                | x when x < Physics.controlMaxDistance ->
+                if Physics.canTrap ball playerState then
                     { playerState with direction = dir ; speed = 0.0f<m/s> ; activity = Player.Trapping }
-                | _ ->
+                else
                     runToPos ballPos2
 
         | None ->
