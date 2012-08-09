@@ -34,7 +34,7 @@ let transform sx sy tx ty pos =
 
 let formation442 =
     [ (-1.0f, -0.5f); (-0.33f, -1.0f); (0.33f, -1.0f); (1.0f, -0.5f)
-      (-1.0f, 0.0f); (-0.33f, 0.0f); (0.33f, 0.0f); (1.0f, 0.0f)
+      (-1.0f, 0.5f); (-0.33f, 0.0f); (0.33f, 0.0f); (1.0f, 0.5f)
       (-0.33f, 1.0f); (0.33f, 1.0f)
     ]
     |> List.map (fun (x, y) -> { x = x; y = y })
@@ -42,20 +42,20 @@ let formation442 =
 let getThrowInFormation side y formation team (game : Match.MatchState) =    
     let x =
         match side with
-        | Ball.Left -> -game.pitch.length / 2.0f
-        | Ball.Right -> game.pitch.length / 2.0f
+        | Ball.Left -> -0.5f * game.pitch.length
+        | Ball.Right -> 0.5f * game.pitch.length
 
     let relPos = getRelPos game.pitch (Match.isTeamAttackingUp team game.period) (TypedVector2<m>(x, y))
     let baseY = max -1.0f (relPos.y - 0.5f)
-    let topY = max 1.0f (relPos.y + 0.5f)
+    let topY = min 1.0f (relPos.y + 0.5f)
     let sy = (topY - baseY) / 2.0f
     let ty = (topY + baseY) / 2.0f
     let sx = 0.5f
     let tx =
         if relPos.x > 0.0f then
-            0.5f
+            0.4f
         else
-            -0.5f
+            -0.4f
 
     formation
     |> List.map (transform sx sy tx ty)
