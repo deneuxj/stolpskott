@@ -108,7 +108,7 @@ let getPlayFormation formation team (game : Match.MatchState) =
 
 let getKickInFormation formation team (game : Match.MatchState) =
     let sx = 0.5f
-    let tx = 0.5f
+    let tx = 0.0f
     let sy = 0.5f
     let ty = 0.0f
     
