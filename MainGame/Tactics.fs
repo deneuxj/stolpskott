@@ -62,18 +62,18 @@ let getThrowInFormation side y formation team (game : Match.MatchState) =
 
 let getCornerDefenseFormation formation team (game : Match.MatchState) =
     let sx = 0.5f
-    let tx = 0.5f
-    let sy = 0.5f
-    let ty = -0.5f
+    let tx = 0.0f
+    let sy = 0.25f
+    let ty = -0.75f
     
     formation
     |> List.map (transform sx sy tx ty)
 
 let getCornerAttackFormation formation team (game : Match.MatchState) =
     let sx = 0.5f
-    let tx = 0.5f
-    let sy = 0.5f
-    let ty = 0.5f
+    let tx = 0.0f
+    let sy = 0.25f
+    let ty = 0.7f
     
     formation
     |> List.map (transform sx sy tx ty)
