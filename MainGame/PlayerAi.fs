@@ -711,9 +711,6 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     }
 
 
-let kickDistance = 0.5f * (Physics.kickMaxDistance + Physics.pushedDistance)
-let passDistance = 0.5f * (Physics.controlMaxDistance + Physics.pushedDistance)
-
 let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerState : Player.State) =
     let ball = matchState.ball
     let team =
@@ -802,14 +799,13 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
     | _, Player.Passing ->
         { playerState with activity = Player.Stumbling 0.0f<s> }
     | CrossingTo pos, Player.Standing ->
-        match distToBall playerState.pos with
-        | x when x < passDistance ->
+        if Physics.canKick ball playerState then
             match pos - playerState.pos |> TypedVector.tryNormalize2 with
             | Some d ->
                 { playerState with activity = Player.Crossing ; direction = d }
             | None ->
                 { playerState with speed = 0.0f<m/s> }
-        | _ ->
+        else
             runToPos ballPos2
     | CrossingTo _, Player.Crossing ->
         { playerState with activity = Player.Standing ; speed = 0.0f<m/s> }
