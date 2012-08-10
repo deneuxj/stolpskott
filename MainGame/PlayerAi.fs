@@ -737,24 +737,30 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
             { playerState with activity = Player.Standing; speed = 0.0f<m/s> }
 
     let runWithBallTo target =
-        match target - playerState.pos |> TypedVector.tryNormalize2 with
-        | Some dir ->
-            if TypedVector.dot2(ballPos2 - playerState.pos, dir) >= 0.0f<m> then
-                if Physics.canPush ball playerState then
-                    runToPos ballPos2
-                else
-                    let relPos = ballPos2 - playerState.pos
-                    let toBall = TypedVector.normalize2 relPos
+        let relPos = ballPos2 - playerState.pos
+        match TypedVector.tryNormalize2 relPos with
+        | Some toBall ->
+            match target - playerState.pos |> TypedVector.tryNormalize2 with
+            | Some dir ->
+                if TypedVector.dot2(toBall, dir) >= 0.0f then
+                    if Physics.canPush ball playerState then
+                        // Push the ball
+                        runToPos ballPos2
+                    else
+                        // Adjust course    
+                        let toBall = TypedVector.normalize2 relPos
+                        let side = TypedVector2<1>(toBall.Y, -toBall.X)
+                        let proj = TypedVector.dot2(dir, side)
+                        let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
+                        { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
+                else // Ball on the wrong side of the player
+                    // Run around the ball to get on the right side
                     let side = TypedVector2<1>(toBall.Y, -toBall.X)
-                    let proj = TypedVector.dot2(dir, side)
-                    let newDir = toBall - 0.75f * proj * side |> TypedVector.normalize2
-                    { playerState with direction = newDir ; speed = Player.getRunSpeed playerState }
-            else // Ball behind the player
-                if Physics.canTrap ball playerState then
-                    { playerState with direction = dir ; speed = 0.0f<m/s> ; activity = Player.Trapping }
-                else
-                    runToPos ballPos2
-
+                    let destination = ballPos2 + 5.0f<m> * (toBall + side)
+                    runToPos destination
+            | None ->
+                // Already at target. Stop
+                { playerState with speed = 0.0f<m/s> ; activity = Player.Standing }
         | None ->
             runToPos target
 
