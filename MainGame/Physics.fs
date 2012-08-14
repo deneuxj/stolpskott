@@ -287,11 +287,11 @@ let collideBallWithPlayer dt (playerId, player : Player.State) ball =
         Free
 
 
-let collidePlayersWithBall dt ball players =
+let combineImpulses impulses =
     let impulse =
-        players
-        |> Seq.fold (fun impulse player ->
-            match impulse, collideBallWithPlayer dt player ball with
+        impulses
+        |> Seq.fold (fun impulse playerImpulse ->
+            match impulse, playerImpulse with
             // Free is the neutral element of impulse combination.
             | Free, impulse
             | impulse, Free -> impulse
@@ -444,8 +444,8 @@ let collideGoalPostsWithBall dt (pitch : Pitch.PitchTraits) goal ball =
 let gravity = TypedVector3<m/s^2>(0.0f<_>, 0.0f<_>, -9.8f<_>)
 let airDrag = 0.5f</s>
 
-let updateBall pitch (dt : float32<s>) players ball =
-    let impulse = collidePlayersWithBall dt ball players
+let updateBall pitch (dt : float32<s>) impulses ball =
+    let impulse = combineImpulses impulses
     
     let speed =
         match impulse with

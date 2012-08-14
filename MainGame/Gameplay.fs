@@ -267,8 +267,15 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                 | Some (team, idx) when team = side && idx = i ->
                     // Human-controlled
                     let hasBallControl =
-                        (playerState.pos - TypedVector2<m>(state.Value.ball.pos.X, state.Value.ball.pos.Y)).Length < 1.5f<m>
-                    Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > 1.5f<m>) playerState
+                        let ballPos2 = Physics.vector2Of3 state.Value.ball.pos
+                        let minDistanceToBall =
+                            match side with
+                            | Team.TeamA -> state.Value.teamB.onPitch
+                            | Team.TeamB -> state.Value.teamA.onPitch
+                            |> Array.map (fun { pos = pos } -> (pos - ballPos2).Length)
+                            |> Array.min
+                        (playerState.pos - ballPos2).Length <= minDistanceToBall
+                    Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > Physics.rakeHeight) playerState
                 | Some _
                 | None ->
                     // AI-controlled
@@ -280,27 +287,44 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                     match objectives.TryFind i with
                     | Some objective -> PlayerAi.actPlayerOnObjective side state.Value objective playerState
                     | None -> playerState)
+        
         let teamA =
             updateTeam Team.TeamA
 
         let teamB =
             updateTeam Team.TeamB
 
-        let allPlayersA =
-            teamA
-            |> Array.mapi (fun i playerState -> (Team.TeamA, i), playerState)
+        let allPlayers =
+            let allPlayersA =
+                teamA
+                |> Array.mapi (fun i playerState -> (Team.TeamA, i), playerState)
 
-        let allPlayersB =
-            teamB
-            |> Array.mapi (fun i playerState -> (Team.TeamB, i), playerState)
+            let allPlayersB =
+                teamB
+                |> Array.mapi (fun i playerState -> (Team.TeamB, i), playerState)
+        
+            Array.append allPlayersA allPlayersB
 
-        let allPlayers = Array.append allPlayersA allPlayersB
+        let impulses =
+            allPlayers
+            |> Array.map (fun player -> Physics.collideBallWithPlayer dt player state.Value.ball)
 
         let ballState, impulse =
             if ballPhysicsEnabled.Value then
-                Physics.updateBall state.Value.pitch dt allPlayers state.Value.ball
+                Physics.updateBall state.Value.pitch dt impulses state.Value.ball
             else
                 state.Value.ball, Physics.Free
+
+        // Tackling players that touch the ball: update their state
+        let allPlayerStates =
+            Array.zip allPlayers impulses
+            |> Array.map(fun ((playerId, state), impulse) ->
+                match state.activity, impulse with
+                | Player.Tackling(keyframe, _), Physics.BouncedOffPlayer(_, _) ->
+                    { state with activity = Player.Tackling(keyframe, true) }
+                | _ -> state)        
+        let teamA = allPlayerStates.[0 .. teamA.Length - 1]
+        let teamB = allPlayerStates.[teamA.Length..]
 
         let ballState =
             match impulse with
