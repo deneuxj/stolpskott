@@ -102,6 +102,9 @@ let collideLightWithHeavy (r : float32<1>) (normal : TypedVector3<1>) (speed : T
 let vector3Of2 (v2 : TypedVector2<'M>) : TypedVector3<'M>=
     TypedVector3<'M>(v2.X, v2.Y, 0.0f<_>)
 
+let vector2Of3 (v3 : TypedVector3<'M>) : TypedVector2<'M>=
+    TypedVector2<'M>(v3.X, v3.Y)
+
 type BallImpulse<'PlayerId> =
     | Free
     | Bounced of TypedVector3<m/s> // Bounced off an obstacle (goal post...)
