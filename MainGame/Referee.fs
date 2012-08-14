@@ -5,8 +5,21 @@ open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils.CoopMultiTasking
 
 open Match
+open Player
 
 let wallDistance = 9.15f<m>
+
+let playerDoesFoulTackling opponents player =
+    match player with
+    | { activity = Player.Tackling(_, false) ; pos = pos } -> // Tackling, hasn't touched the ball since tackling initiated.
+        opponents
+        |> Array.choose (fun { pos = pos2 } ->
+            if (pos - pos2).Length < Physics.pushedDistance then
+                Some pos2
+            else
+                None)
+    | _ ->
+        Array.empty
 
 let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchState) (setMatchState : MatchState -> unit) (reportScored : Team.TeamSide -> unit) (kickerReady : IEvent<_>) (ballKicked : IEvent<_>) =
     let watch = env.NewStopwatch()
@@ -42,7 +55,7 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
             elif state.ball.pos.Y < -state.pitch.length / 2.0f - Ball.ballRadius then
                 InLowerGoal
             else
-                Other
+                Other state
         elif state.ball.pos.X > state.pitch.width / 2.0f + Ball.ballRadius then
             OutRight
         elif state.ball.pos.X < -state.pitch.width / 2.0f - Ball.ballRadius then
@@ -52,7 +65,24 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
         elif state.ball.pos.Y < -state.pitch.length / 2.0f - Ball.ballRadius then
             OutLower
         else
-            Other
+            Other state
+
+    let (|Foul|NoFoul|) (state : MatchState) =
+        let foulsOnTacklesFromA =
+            state.teamA.onPitch
+            |> Array.map (playerDoesFoulTackling state.teamB.onPitch)
+            |> Array.concat
+
+        let foulsOnTacklesFromB =
+            state.teamB.onPitch
+            |> Array.map (playerDoesFoulTackling state.teamA.onPitch)
+            |> Array.concat
+
+        match foulsOnTacklesFromA, foulsOnTacklesFromB with
+        | [||], [||] -> NoFoul
+        | fouls, [||] -> Foul(Team.TeamA, fouls.[0])
+        | [||], fouls -> Foul(Team.TeamB, fouls.[1])
+        | _, _ -> NoFoul // If both teams foul, ignore it (not very likely)
 
     let switchToDeadBall (state : MatchState) =
         let otherTeam =
@@ -109,8 +139,15 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                                     inPlay = Ball.KickIn(homeTeam, pitchSide) }
                     }
 
-            | Other ->
+            | Other (Foul(committer, pos)) ->
+                { state with
+                    ball = { state.ball with
+                                inPlay = Ball.FreeKick(Team.otherSide committer, pos) }
+                }
+
+            | Other NoFoul ->
                 state
+
 
     let engagementWhistle = env.NewChannel()
     let engagement killed =
