@@ -274,7 +274,8 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                             | Team.TeamB -> state.Value.teamA.onPitch
                             |> Array.map (fun { pos = pos } -> (pos - ballPos2).Length)
                             |> Array.min
-                        (playerState.pos - ballPos2).Length <= minDistanceToBall
+                        let distanceToBall = (playerState.pos - ballPos2).Length
+                        distanceToBall <= minDistanceToBall && distanceToBall < Physics.controlMaxDistance
                     Controls.updateControl config dt prePad pad hasBallControl (state.Value.ball.pos.Z > Physics.rakeHeight) playerState
                 | Some _
                 | None ->
