@@ -25,3 +25,13 @@ let boundBall (pitch : PitchTraits) (ball : Ball.State) =
             ball.speed
 
     { ball with speed = speed }
+
+let inOwnPenaltyBox pitch isAttackingUp (pos : TypedVector2<m>) =
+    let halfLength = pitch.length / 2.0f
+    let vtest =
+        if isAttackingUp then
+            (fun y -> y < -halfLength + penaltyBoxHeight && y > -halfLength)
+        else
+            (fun y -> y > pitch.length / 2.0f - penaltyBoxHeight && y < halfLength)
+
+    vtest pos.Y && abs pos.X < penaltyBoxWidth / 2.0f

@@ -27,6 +27,11 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
         | Team.TeamA -> getMatchState().teamA
         | Team.TeamB -> getMatchState().teamB
 
+    let getOpponents() =
+        match side with
+        | Team.TeamA -> getMatchState().teamB
+        | Team.TeamB -> getMatchState().teamA
+
     let getBall() =
         getMatchState().ball
                 
@@ -262,7 +267,15 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 do! env.WaitNextFrame()
                 if not !killed then
                     if ballInBox() then
-                        RunningToBall |> assign keeper
+                        let target =
+                            let x =
+                                if getBall().pos.X > 0.0f<m> then
+                                    50.0f<m>
+                                else
+                                    -50.0f<m>
+                            let y = 0.0f<m>
+                            TypedVector2<m>(x, y)
+                        CrossingTo target |> assign keeper
                     else
                         runToDefensivePos()
                 let! stop = shouldStop
@@ -478,7 +491,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     |> Array.exists (function { activity = Player.Standing ; speed = 0.0f<m/s> } -> false | _ -> true)
                     |> not        
         }
-                
+                    
     let defendCorner =
         task {
             do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
@@ -645,15 +658,67 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             orderFormation Tactics.getKickInFormation
             return! waitUntilBallInPlay
         }
-        
-    let defendFreeKick =
+
+    let moveAwayFrom center pos =
+        let minDist = 9.5f<m>
+        let relPos = pos - center
+        let dist = TypedVector.len2 relPos
+        if dist < minDist then
+            let d = (1.0f / dist) * relPos
+            center + minDist * d
+        else
+            pos
+
+    let defendFreeKick kickPos =
         task {
-            return! env.WaitNextFrame()
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
+            orderFormation Tactics.getFreeKickDefenseFormation
+
+            let ballInPlay =
+                env.Spawn <|
+                    fun _ -> waitUntilBallInPlay
+
+            let moveAwayFromBall =
+                env.Spawn <|
+                    fun _ -> task {
+                        do! waitTeamStill
+                        getTeam().onPitch
+                        |> Array.iteri (fun i { pos = pos } -> RunningTo(moveAwayFrom kickPos pos, absUp()) |> assign i)
+                    }
+
+            do! env.WaitUntil <| fun () -> ballInPlay.IsDead
+            moveAwayFromBall.Kill()
         }
 
-    let freeKick =
+    let waitOpponentsAway center =
         task {
-            return! env.WaitNextFrame()
+            let minDist = 5.0f<m>
+            return! env.WaitUntil <|
+                fun () ->
+                    getOpponents().onPitch
+                    |> Array.exists (fun { pos = pos } -> (pos - center).Length < minDist)
+                    |> not        
+        }
+
+    let freeKick kickPos =
+        task {
+            do! grabKeeper (RunningTo (getAbsPos { x = 0.0f ; y = -1.0f }, absUp()))
+            orderFormation Tactics.getFreeKickFormation
+            do! env.WaitNextFrame()
+            do! waitTeamStill
+
+            let closest, second = pickTwoClosest kickPos (getTeam().onPitch |> Array.map (fun { pos = pos } -> pos))
+            let target = getAbsPos { x = 0.0f ; y = 1.0f }
+
+            do! waitOpponentsAway kickPos
+            kickerReady.Trigger()
+
+            if (target - kickPos).Length < 30.0f<m> then
+                ShootingAtGoal target |> assign closest
+            else
+                PassingTo second |> assign closest
+
+            return! waitUntilBallInPlay
         }
 
     let defendPenalty =
@@ -705,6 +770,13 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                 else
                     printfn "%A: Defend corner" side
                     return! defendCorner
+            | { ball = { inPlay = Ball.FreeKick(owner, kickPos) } } ->
+                if owner = side then
+                    printfn "%A: Kick free kick" side
+                    return! freeKick kickPos
+                else
+                    printfn "%A: Defend free kick" side
+                    return! defendFreeKick kickPos
             | { ball = { inPlay = Ball.LiveBall } as ball } ->
                 printfn "%A: normal play" side
                 return! normalPlay

@@ -114,3 +114,49 @@ let getKickInFormation formation team (game : Match.MatchState) =
     
     formation
     |> List.map (transform sx sy tx ty)
+
+let getFreeKickDefenseFormation formation team (game : Match.MatchState) =
+    let isAttackingUp = Match.isTeamAttackingUp team game.period
+    let ballPos2 = TypedVector2<m>(game.ball.pos.X, game.ball.pos.Y)
+    let ballRelPos = ballPos2 |> getRelPos game.pitch isAttackingUp
+
+    let baseY, topY =
+        let baseY =
+            min -0.8f ballRelPos.y
+    
+        let topY = ballRelPos.y
+        let diffY = min (topY - baseY) 0.5f
+        topY - diffY, topY
+
+    let sx = 0.5f
+    let tx = 0.0f
+
+    let sy = (topY - baseY) / 2.0f
+    let ty = (topY + baseY) / 2.0f
+
+    let formation0 =
+        formation
+        |> List.map (transform sx sy tx ty)
+
+    formation0
+
+let getFreeKickFormation formation team (game : Match.MatchState) =
+    let isAttackingUp = Match.isTeamAttackingUp team game.period
+    let ballPos2 = TypedVector2<m>(game.ball.pos.X, game.ball.pos.Y)
+    let ballRelPos = ballPos2 |> getRelPos game.pitch isAttackingUp
+
+    let topY = 0.8f
+    let baseY = 0.0f
+
+    let sx = 0.5f
+    let tx = 0.0f
+
+    let sy = (topY - baseY) / 2.0f
+    let ty = (topY + baseY) / 2.0f
+
+    let formation0 =
+        formation
+        |> List.map (transform sx sy tx ty)
+
+    formation0
+

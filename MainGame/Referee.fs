@@ -11,7 +11,7 @@ let wallDistance = 9.15f<m>
 
 let playerDoesFoulTackling opponents player =
     match player with
-    | { activity = Player.Tackling(_, false) ; pos = pos } -> // Tackling, hasn't touched the ball since tackling initiated.
+    | { activity = Player.Tackling(_, _ (*false*)) ; pos = pos } -> // Tackling, hasn't touched the ball since tackling initiated.
         opponents
         |> Array.choose (fun { pos = pos2 } ->
             if (pos - pos2).Length < Physics.pushedDistance then
@@ -140,9 +140,14 @@ let refereeTask (env : Environment) timeFactor (getMatchState : unit -> MatchSta
                     }
 
             | Other (Foul(committer, pos)) ->
+                let inPlay =
+                    if false && Pitch.inOwnPenaltyBox state.pitch (Match.isTeamAttackingUp committer state.period) pos then
+                        Ball.Penalty(Ball.Engagement.WaitWhistle, Team.otherSide committer)
+                    else
+                        Ball.FreeKick(Team.otherSide committer, pos)
                 { state with
                     ball = { state.ball with
-                                inPlay = Ball.FreeKick(Team.otherSide committer, pos) }
+                                inPlay = inPlay }
                 }
 
             | Other NoFoul ->
