@@ -255,13 +255,15 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
         let pad = Input.GamePad.GetState(playerIndex)
 
         let updateTeam side =
-            match side with
-            | Team.TeamA -> state.Value.teamA.onPitch
-            | Team.TeamB -> state.Value.teamB.onPitch
-            |> Array.map (fun playerState ->
-                playerState
-                |> Player.updateKeyFrame dt
-                |> Player.updatePlayer dt)
+            let team =
+                match side with
+                | Team.TeamA -> state.Value.teamA.onPitch
+                | Team.TeamB -> state.Value.teamB.onPitch
+                |> Array.map (fun playerState ->
+                    playerState
+                    |> Player.updateKeyFrame dt
+                    |> Player.updatePlayer dt)
+            team
             |> Array.mapi (fun i playerState ->
                 match playerControlled.Value with
                 | Some (team, idx) when team = side && idx = i ->
@@ -286,7 +288,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                         | Team.TeamB -> teamBObjectives.Value
 
                     match objectives.TryFind i with
-                    | Some objective -> PlayerAi.actPlayerOnObjective side state.Value objective playerState
+                    | Some objective -> PlayerAi.actPlayerOnObjective team state.Value.pitch state.Value.ball objective playerState
                     | None -> playerState)
         
         let teamA =

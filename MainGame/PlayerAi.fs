@@ -812,12 +812,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
     }
 
 
-let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerState : Player.State) =
-    let ball = matchState.ball
-    let team =
-        match side with
-        | Team.TeamA -> matchState.teamA.onPitch
-        | Team.TeamB -> matchState.teamB.onPitch
+let actPlayerOnObjective (team : Player.State[]) (pitch : Pitch.PitchTraits) (ball : Ball.State) objective (playerState : Player.State) =
 
     let ballPos2 = TypedVector2<m>(ball.pos.X, ball.pos.Y)
     let ballSpeed2 = TypedVector2<m/s>(ball.speed.X, ball.speed.Y)
@@ -841,7 +836,6 @@ let actPlayerOnObjective side (matchState : Match.MatchState) objective (playerS
             match target - ballPos2 |> TypedVector.tryNormalize2 with
             | Some dir ->
                 let ballNearLine =
-                    let pitch = matchState.pitch
                     abs(ballPos2.X) > pitch.width / 2.0f - 3.0f<m>
                     ||
                     abs(ballPos2.Y) > pitch.length / 2.0f - 3.0f<m>
