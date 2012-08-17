@@ -305,15 +305,15 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
             let team = getTeam()
             let ball = getBall()
 
-            let formation =
-                Tactics.getPlayFormation Tactics.formation442 side (getMatchState())
-                |> List.map getAbsPos
-                |> Array.ofList
-
             let closestToBall, _ =
                 team.onPitch
                 |> Array.mapi (fun i player -> i, timeToBall ball player (* (player.pos - Physics.vector2Of3 ball.pos).Length*))
                 |> Array.minBy snd
+
+            let formation =
+                Tactics.getPlayFormation Tactics.formation442 side (getMatchState())
+                |> List.map getAbsPos
+                |> Array.ofList
 
             // Order the player closest to the ball to run to the ball,
             // Other players run to the position assigned by the formation.
@@ -340,7 +340,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                     1.0f,
                     fun () ->
                         match getMatchState() with
-                        | { ball = { inPlay = Ball.LiveBall } as ball ; teamA = teamA ; teamB = teamB } ->
+                        | { ball = { inPlay = Ball.LiveBall } as ball } ->
                             let team = getTeam()
                             let player = team.onPitch.[closestToBall]
                             let ballPos2 = TypedVector2<m>(ball.pos.X, ball.pos.Y)
@@ -351,13 +351,14 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
 
             // If the player is close to the ball, decide what to do
             match getMatchState() with
-            | { ball = { inPlay = Ball.LiveBall } as ball ; teamA = teamA ; teamB = teamB } ->
+            | { ball = { inPlay = Ball.LiveBall } as ball } ->
                 let team = getTeam()
                 let player = team.onPitch.[closestToBall]
                 let ballPos2 = TypedVector2<m>(ball.pos.X, ball.pos.Y)
                 let distToBall = player.pos - ballPos2 |> TypedVector.len2
                 if distToBall < 1.0f<m> then
                     if closestToBall = 0 then
+                        // Goal keeper is closest to the ball, clear it.
                         let target =
                             player.pos + 50.0f<m> * getClearUpDirection player.direction
                         CrossingTo target |> assign closestToBall
@@ -369,6 +370,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                         RunningWithBallTo goalPos |> assign closestToBall
                         do! env.Wait(0.25f)
                         let team = getTeam()
+                        let player = team.onPitch.[closestToBall]
                         let ball = getBall()
                         let ballPos2 = TypedVector2<m>(ball.pos.X, ball.pos.Y)
                         let distToBall = player.pos - ballPos2 |> TypedVector.len2
@@ -436,7 +438,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                                     goalPos - playerPos |> TypedVector.tryNormalize2
                                 match dirToGoal with
                                 | Some d ->
-                                    if d.X < 0.8f then
+                                    if abs d.X < 0.8f then
                                         ShouldShoot
                                     else
                                         ShouldRun
@@ -454,7 +456,7 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                                     else ShouldPass
                                 | None -> ShouldRun
 
-                        let maxTime = 1.0f<s>
+                        let maxTime = 0.5f<s>
                         match (player.pos, targetPos) with
                         | ShouldPass ->
                             match bestPass with
@@ -473,13 +475,9 @@ let assignObjectives (env : Environment) formation assign side (getMatchState : 
                             | None ->
                                 do! env.WaitNextFrame()
                         | ShouldShoot ->
-                            let target = getAbsPos { x = 0.0f ; y = 1.0f }
-                            ShootingAtGoal target |> assign closestToBall
+                            ShootingAtGoal goalPos |> assign closestToBall
                             let! shotCompleted = waitKick maxTime closestToBall
-                            if shotCompleted then
-                                printfn "SHOOT!"
-                            else
-                                printfn "Failed to shoot"
+                            ()
                         | ShouldRun ->
                             RunningWithBallTo goalPos
                             |> assign closestToBall
@@ -911,38 +909,28 @@ let actPlayerOnObjective (team : Player.State[]) (pitch : Pitch.PitchTraits) (ba
         { playerState with activity = Player.Stumbling 0.0f<s> }
 
     | CrossingTo target, Player.Standing ->
-        if TypedVector.dot2(target - playerState.pos, playerState.direction) > 0.0f<m> then 
-            if Physics.canPush ball playerState then
-                runToPos (playerState.pos + ballPos2 - target)
-            elif Physics.canKick ball playerState then
-                match target - playerState.pos |> TypedVector.tryNormalize2 with
-                | Some d ->
-                    { playerState with activity = Player.Crossing ; direction = d }
-                | None ->
-                    { playerState with activity = Player.Crossing }
-            else
-                runToPos ballPos2
+        if Physics.canTrap ball playerState then
+            match target - playerState.pos |> TypedVector.tryNormalize2 with
+            | Some d ->
+                { playerState with activity = Player.Trapping ; direction = d }
+            | None ->
+                { playerState with activity = Player.Trapping }
         else
-            runWithBallTo target
-    | CrossingTo _, Player.Crossing ->
-        { playerState with activity = Player.Standing ; speed = 0.0f<m/s> }
+        runToPos ballPos2
     | CrossingTo _, Player.Trapping ->
         { playerState with activity = Player.Crossing }
+    | CrossingTo _, Player.Crossing ->
+        { playerState with activity = Player.Standing ; speed = 0.0f<m/s> }
 
     | ShootingAtGoal target, Player.Standing ->
-        if TypedVector.dot2(target - playerState.pos, playerState.direction) > 0.0f<m> then 
-            if Physics.canPush ball playerState then
-                runToPos (playerState.pos + ballPos2 - target)
-            elif Physics.canKick ball playerState then
-                match target - playerState.pos |> TypedVector.tryNormalize2 with
-                | Some d ->
-                    { playerState with activity = Player.Kicking 0.0f<kf> ; direction = d }
-                | None ->
-                    { playerState with activity = Player.Kicking 0.0f<kf> }
-            else
-                runToPos ballPos2
+        if Physics.canTrap ball playerState then
+            match target - playerState.pos |> TypedVector.tryNormalize2 with
+            | Some d ->
+                { playerState with activity = Player.Trapping ; direction = d }
+            | None ->
+                { playerState with activity = Player.Trapping }
         else
-            runWithBallTo target
+            runToPos ballPos2
     | ShootingAtGoal _, Player.Trapping ->
         { playerState with activity = Player.Kicking 0.0f<kf> }
     
