@@ -6,9 +6,23 @@ open Microsoft.Xna.Framework
 open CleverRake.XnaUtils.Units
 open CleverRake.XnaUtils
 open CleverRake.StolpSkott.Units
+open CleverRake.XnaUtils.Pi
 
-[<Measure>] type px // Pixels
+// Pixels
+[<Measure>] type px
 
+// Some animations are available at 3 angles, depending on the direction the
+// character is facing: up, down and right.
+// Animations in the left direction use a mirrored version of the animations to
+// the right direction.
+// Animations in the diagonal directions use up and down rotated
+// +/- 45 degrees.
+type StripDirection =
+    | Up
+    | Down
+    | Right
+
+// Textures, sound effects... used in render functions.
 type Resources =
     {
         grassLight : Texture2D
@@ -17,14 +31,24 @@ type Resources =
         goalLower : Texture2D
         ball : Texture2D
         ballShadow : Texture2D
-        playerSprites : Texture2D
-        playerShadows : Texture2D
+        playerRunUp : Texture2D
+        playerRunDown: Texture2D
+        playerRunRight: Texture2D
+        playerTackle: Texture2D
+        playerJumpUp : Texture2D
+        playerJumpDown : Texture2D
+        playerJumpRight : Texture2D
+        keeperDiveUp : Texture2D
+        keeperDiveDown : Texture2D
+//        playerShadows : Texture2D
         whiteLine : Texture2D
         ballKick : SoundEffect
     }
 
+// Ratio pixels/world length units
 let ratio = 2048.0f<px> / 80.0f<m>
 
+// Convert world coordinates to screen coordinates
 let worldToScreen
     (screenWidth : float32<px>, screenHeight : float32<px>)
     (viewWidth : float32<m>, viewHeight : float32<m>)
@@ -35,15 +59,19 @@ let worldToScreen
     let y' = (-(y - viewY) / viewHeight + 0.5f) * screenHeight
     (x', y')
 
+// Shortcut to compare IComparable(T) instances for a given T.
 let inline cmp (o1 : #System.IComparable<'T>) (o2 : #System.IComparable<'T>) =
     o1.CompareTo(o2)
 
+// Type used to compute the order in which sprites are rendered.
 type SpriteType =
     | Ball of Ball.State
     | Player of Player.State * Team.TeamSide
     | GoalUpper
     | GoalLower
 with
+    // Sorting of sprite types to avoid overdraw bugs.
+    // We draw objects that are high on the screen first
     static member Compare(this, other) =
         match this, other with
         | Ball b1, Ball b2 -> cmp b1.pos.Y b2.pos.Y
@@ -76,7 +104,14 @@ with
         | GoalLower, GoalLower -> 0
         | GoalLower, GoalUpper -> +1
 
-let renderGrass (sb : SpriteBatch) (viewWidth : float32<m>, viewHeight : float32<m>) (lightGrass : Texture2D) (darkGrass : Texture2D) (viewX : float32<m>, viewY : float32<m>) =
+// Render the grass strips
+let renderGrass
+    (sb : SpriteBatch)
+    (viewWidth : float32<m>, viewHeight : float32<m>)
+    (lightGrass : Texture2D)
+    (darkGrass : Texture2D)
+    (viewX : float32<m>, viewY : float32<m>) =
+
     let darkStripHeight = 1.0f<px> * float32 darkGrass.Height / ratio
     let darkStripWidth = 1.0f<px> * float32 darkGrass.Width / ratio
     let lightStripHeight = 1.0f<px> * float32 lightGrass.Height / ratio
@@ -118,7 +153,8 @@ let renderGrass (sb : SpriteBatch) (viewWidth : float32<m>, viewHeight : float32
 
         sb.Draw((if stripIsDark then darkGrass else lightGrass), Vector2(x / 1.0f<px>, y / 1.0f<px>), Color.White))
 
-
+// Render the lines using provided functions.
+// This is used both for the pitch and the radar.
 let renderPitchLines drawHLine drawVLine (pitch : Pitch.PitchTraits) =
     // Outer lines, middle line.
     let x0 = -pitch.width / 2.0f
@@ -171,7 +207,7 @@ let renderPitchLines drawHLine drawVLine (pitch : Pitch.PitchTraits) =
     drawVLine (x1, y0) y1
     drawHLine (x0, y1) x1
 
-
+// Render the pitch lines
 let renderLines
     (sb : SpriteBatch)
     (viewWidth : float32<m>, viewHeight : float32<m>)
@@ -197,7 +233,7 @@ let renderLines
 
     renderPitchLines drawHLine drawVLine pitch
 
-
+// Render the transparent radar
 let renderRadar
     (sb : SpriteBatch)
     (radarX : float32<px>, radarY : float32<px>)
@@ -244,6 +280,7 @@ let renderRadar
 let sin45m = sin (0.5f * MathHelper.PiOver4)
 let sin45M = sin (1.5f * MathHelper.PiOver4)
 let sin45 = sin (MathHelper.PiOver4)
+// Discretize an angle in 45-degree steps.
 let discretizeTrigo x =
     let x' = abs x
     let sx =
@@ -257,27 +294,62 @@ let discretizeTrigo x =
         -sx
     else
         sx
+
+// Active pattern that identified the strip direction rotation in 45-deg increments.
+// The returned angle is expressed in radians.
+// match (dirX, dirY) with Dig90 rotationAngle -> ...
+let (|Dir0|Dir90|Dir180|) (x, y) =
+    let (|Pos|Neg|Zero|) x =
+        if x = 0.0f then
+            Zero
+        elif x < 0.0f then
+            Neg
+        else
+            Pos
+
+    match (discretizeTrigo x, discretizeTrigo y) with
+    | Pos, Zero -> Dir90 0.0f
+    | Neg, Zero -> Dir90 π
+    | Zero, Pos -> Dir180 0.0f
+    | Zero, Neg -> Dir0 0.0f
+    | Pos, Pos -> Dir180 (π/4.0f)
+    | Pos, Neg -> Dir0 (-π/4.0f)
+    | Neg, Pos -> Dir180 (-π/4.0f)
+    | Neg, Neg -> Dir0 (π/4.0f)
+    | Zero, Zero -> Dir0 0.0f
+
+// Identify the sprite strip based on the activity of a player.
+let (|Running|Jumping|Tackling|Diving|) =
+    function
+    | Player.Crossing
+    | Player.Kicking _
+    | Player.Passing
+    | Player.Standing
+    | Player.Trapping
+    | Player.Stumbling _ -> Running
+    | Player.Jumping _ -> Jumping
+    | Player.Tackling _ -> Tackling
+    | Player.KeeperDive _ -> Diving
+    | Player.Fallen _ -> Tackling
     
-let runningFrames = [| 0 .. 3 |]
-let tacklingFrames = Array.concat [[| 3 .. 8 |] ; [| 8;8;8;8;8 |]]
-let jumpingFrames = Array.concat [[|3|] ; [| 9 .. 13 |]]
-
-let getFrame frames (kf : float32<kf>) =
-    let num = Array.length frames
-    let idx =
-        kf * (1.0f + float32 num)
-        |> int
-        |> min (num - 1)
-        |> max 0
-    frames.[idx]
-
+// Distance from spine to outer point of the shoulder    
 let playerRadius = 0.32f<m>
 
-let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites goalUpper (goalLower : Texture2D) (pitch : Pitch.PitchTraits) (viewX, viewY) sprites =
+// Render the ball, the players and the goals.
+let renderSprites
+    (sb : SpriteBatch)
+    (viewWidth, viewHeight)
+    (resources: Resources)
+    (period : Match.MatchPeriod)
+    (pitch : Pitch.PitchTraits)
+    (viewX, viewY)
+    sprites =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
     // Vertical displacement due to the slightly tipped view angle
-    let elevation = 1.0f<px> * (float32 <| goalLower.Height / 2) / Physics.goalHeight
+    // The lower goal sprite is drawed in such a way that the length of a post
+    // takes half the height of the sprite.
+    let elevation = 1.0f<px> * (float32 <| resources.goalLower.Height / 2) / Physics.goalHeight
 
     for s in sprites do
         match s with
@@ -288,44 +360,49 @@ let renderSprites (sb : SpriteBatch) (viewWidth, viewHeight) ball playerSprites 
             let y = b.pos.Y + scaledRadius
             let x, y = worldToScreen (x, y)
             let w = 2.0f * scaledRadius * ratio |> int
-            sb.Draw(ball, Rectangle(int x, int (y - elevation * b.pos.Z), w, w), Color.White)
+            sb.Draw(resources.ball, Rectangle(int x, int (y - elevation * b.pos.Z), w, w), Color.White)
 
         | Player(player, side) ->
             let x = player.pos.X
             let y = player.pos.Y
             let x, y = worldToScreen (x, y)
             let w = 2.0f * playerRadius * ratio |> int
+            let stripDirection, angle =
+                match player.activity, (player.direction.X, player.direction.Y) with
+                | Diving, _ -> StripDirection.Right, 0.0f
+                | _, Dir90 angle -> StripDirection.Right, angle
+                | _, Dir180 angle -> StripDirection.Down, angle
+                | _, Dir0 angle -> StripDirection.Up, angle
+            let strip =
+                match player.activity, stripDirection with
+                | Running, StripDirection.Right -> resources.playerRunRight
+                | Running, StripDirection.Down -> resources.playerRunDown
+                | Running, StripDirection.Up -> resources.playerRunUp
+                | Jumping, StripDirection.Right -> resources.playerJumpRight
+                | Jumping, StripDirection.Down -> resources.playerJumpDown
+                | Jumping, StripDirection.Up -> resources.playerJumpUp
+                | Tackling, _ -> resources.playerTackle
+                | Diving, _ when Match.isTeamAttackingUp side period -> resources.keeperDiveUp
+                | Diving, _ -> resources.keeperDiveDown
             let sw = 32
-            let sx, sy =
-                match player.activity with
-                | Player.Standing _ ->
-                    sw * runningFrames.[player.runningFrame], 0
-                | Player.Tackling(kf, _) ->
-                    let frame = getFrame tacklingFrames kf
-                    sw * frame, 0
-                | Player.Jumping kf ->
-                    let frame = getFrame jumpingFrames kf
-                    sw * frame, 0
-                | _ -> 0, 0
-            let dx = player.direction.X |> discretizeTrigo
-            let dy = player.direction.Y |> discretizeTrigo
-            let angle = atan2 dx dy
-            let color =
-                match player, side with
-                | { isKeeper = true }, _ -> Color.Green
-                | { isKeeper = false }, Team.TeamA -> Color.White
-                | { isKeeper = false }, Team.TeamB -> Color.Red
-            sb.Draw(playerSprites, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, sy, sw, sw)), color, angle, Vector2(16.0f, 16.0f), SpriteEffects.None, 0.0f)
+            let sx =
+                player.runningFrame * float32 strip.Width
+                |> (*) 32.0f
+                |> truncate
+                |> fun x -> x / 32.0f
+                |> int
+                |> min (strip.Width - sw)
+            sb.Draw(strip, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, 0, sw, sw)), Color.White, angle, Vector2(16.0f, 16.0f), SpriteEffects.None, 0.0f)
 
         | GoalUpper ->
             let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
-            sb.Draw(goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
+            sb.Draw(resources.goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
 
         | GoalLower ->
             let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
-            sb.Draw(goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
+            sb.Draw(resources.goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
 
-
+// Render the shadow of the ball
 let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, viewY) (ballPos : TypedVector3<m>) =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     
@@ -338,6 +415,7 @@ let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, v
 
     sb.Draw(shadow, Rectangle(int x, int y, w, w), color)
 
+// Render the lines under the players that are currently under human control
 let renderHighlights (sb : SpriteBatch) (viewWidth, viewHeight) line highlights (viewX, viewY) =
     let worldToScreen = worldToScreen (ratio * viewWidth, ratio * viewHeight) (viewWidth, viewHeight) (viewX, viewY)
     let color = Color.Yellow
@@ -350,52 +428,8 @@ let renderHighlights (sb : SpriteBatch) (viewWidth, viewHeight) line highlights 
 
         sb.Draw(line, Rectangle(int x, int y, w, 2), color)
     
-let testRender(gd : GraphicsDevice, sb : SpriteBatch, darkGrass, lightGrass, line, ball, player, goalUpper, goalLower, pitch, allPlayers, highlightedPlayers, ballState : Ball.State, (x, y)) =
-    let viewSize =
-        let viewHeight = (1.0f<px> * float32 gd.Viewport.Height) / ratio
-        let viewWidth = (1.0f<px> * float32 gd.Viewport.Width) / ratio
-        (viewWidth, viewHeight)
-    
-    let x, y = x + ballState.pos.X, y + ballState.pos.Y
-
-    let teamA =
-        allPlayers
-        |> Array.choose (
-            function
-            | (Team.TeamA, state : Player.State) -> Some (state.pos)
-            | _ -> None)
-
-    let teamB =
-        allPlayers
-        |> Array.choose (
-            function
-            | (Team.TeamB, state : Player.State) -> Some (state.pos)
-            | _ -> None)
-
-    sb.Begin(SpriteSortMode.Immediate, BlendState.NonPremultiplied)
-    try
-        renderGrass sb viewSize darkGrass lightGrass (x, y)
-        renderLines sb viewSize line pitch (x, y)
-        renderBallShadow sb viewSize ball (x, y) ballState.pos
-        renderHighlights sb viewSize line highlightedPlayers (x, y)            
-        let sprites =
-            [| yield GoalUpper
-               yield GoalLower
-               for (side, playerState) in allPlayers do
-                yield Player(playerState, side)
-               yield Ball(ballState) |]
-        Array.sortInPlaceWith (fun this other -> SpriteType.Compare(this, other)) sprites
-        renderSprites sb viewSize ball player goalUpper goalLower pitch (x, y) sprites
-        let radarSize =
-            let s = 100.0f
-            (1.0f<px> * s, 1.0f<px> * s * pitch.length / pitch.width)
-        let radarPos = (1.0f<px> * float32 gd.Viewport.TitleSafeArea.Left, 1.0f<px> * float32 gd.Viewport.TitleSafeArea.Top)
-        renderRadar sb radarPos radarSize line pitch teamA teamB ballState.pos
-    finally
-        sb.End()
-
-
-let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBatch) viewSize resources (state : Match.MatchState) : unit =
+// Render everything.
+let render (sb : SpriteBatch) viewSize resources (state : Match.MatchState) : unit =
     let viewPos = 
         let viewX = state.ball.pos.X |> max (-state.pitch.width * 0.5f) |> min (state.pitch.width * 0.5f)
         let viewY = state.ball.pos.Y |> max (-state.pitch.length * 0.5f) |> min (state.pitch.length * 0.5f)
@@ -418,9 +452,7 @@ let render renderPlayerShadows renderBallShadow renderGoalShadows (sb : SpriteBa
         sb.Begin()
         renderGrass sb viewSize resources.grassLight resources.grassDark viewPos
         renderLines sb viewSize resources.whiteLine state.pitch viewPos
-        renderPlayerShadows sb viewSize resources.playerShadows viewPos (Array.concat [state.teamA.onPitch ; state.teamB.onPitch])
         renderBallShadow sb viewSize resources.ballShadow viewPos state.ball.pos
-        //renderGoalShadows sb viewSize resources.goalShadows viewPos
-        renderSprites sb viewSize resources.ball resources.playerSprites resources.goalUpper resources.goalLower state.pitch viewPos sprites
+        renderSprites sb viewSize resources state.period state.pitch viewPos sprites
     finally
         sb.End()

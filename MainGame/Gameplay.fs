@@ -47,7 +47,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                   direction = TypedVector2<1>(0.0f, 1.0f)
                   speed = 0.0f<m/s>
                   travelled = 0.0f<m>
-                  runningFrame = 0
+                  runningFrame = 0.0f
                   activity = Player.Standing
                   traits = playerTraits
                   isKeeper = (i = 1)
@@ -230,8 +230,15 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                 goalLower = content.Load("goal-bottom")
                 ball = content.Load("ball")
                 ballShadow = content.Load("ball")
-                playerSprites = content.Load("player")
-                playerShadows = content.Load("player")
+                playerRunUp = content.Load("player-run-up")
+                playerRunDown = content.Load("player-run-down")
+                playerRunRight = content.Load("player-run-right")
+                playerTackle = content.Load("player-tackle")
+                playerJumpUp = content.Load("player-jump-up")
+                playerJumpDown = content.Load("player-jump-down")
+                playerJumpRight = content.Load("player-jump-right")
+                keeperDiveUp = content.Load("player-dive-up")
+                keeperDiveDown = content.Load("player-dive-down")
                 whiteLine = content.Load("white")
                 ballKick = content.Load("ball-kick")
             }
@@ -400,7 +407,9 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                     [ player.pos.X, player.pos.Y ]
                 | None ->
                     []
-            Rendering.testRender(base.GraphicsDevice, spriteBatch, textures.grassDark, textures.grassLight, textures.whiteLine, textures.ball, textures.playerSprites, textures.goalUpper, textures.goalLower, pitch, allPlayers, highlights, state.Value.ball, (x, y))
+            let viewX = 1.0f<Rendering.px> * float32 base.GraphicsDevice.Viewport.Width / Rendering.ratio
+            let viewY = 1.0f<Rendering.px> * float32 base.GraphicsDevice.Viewport.Height / Rendering.ratio
+            Rendering.render spriteBatch (viewX, viewY) textures !state
         | _ -> ()
 
         match spriteBatch.Value, font.Value with

@@ -32,7 +32,7 @@ type State =
       direction : TypedVector2<1>
       speed : float32<m/s>
       travelled : float32<m> // To decide the frame to use when rendering running players
-      runningFrame : int
+      runningFrame : float32 // 0.0 -> 1.0, completion of the running animation
       activity : Activity
       traits : Traits
       isKeeper : bool
@@ -95,16 +95,16 @@ let updateKeyFrame (dt : float32<s>) player =
     { player with activity = activity }
 
 let updatePlayer (dt : float32<s>) player =
-    let distPerRunningFrame = 0.5f<m>
-    let numFrames = 4
+    let runningAnimationDistance = 2.0f<m>
     let player = updateKeyFrame dt player
     let pos = player.pos + dt * player.speed * player.direction
     let travelled = player.travelled + (pos - player.pos).Length
-    let travelled, frame =
-        if travelled > distPerRunningFrame then
-            travelled - distPerRunningFrame, (player.runningFrame + 1) % numFrames
+    let travelled =
+        if travelled > runningAnimationDistance then
+            travelled - runningAnimationDistance
         else
-            travelled, player.runningFrame
+            travelled
+    let frame = travelled / runningAnimationDistance
     let speed =
         match player.activity with
         | Trapping
