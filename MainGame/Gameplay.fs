@@ -237,8 +237,8 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                 playerJumpUp = content.Load("player-jump-up")
                 playerJumpDown = content.Load("player-jump-down")
                 playerJumpRight = content.Load("player-jump-right")
-                keeperDiveUp = content.Load("player-dive-up")
-                keeperDiveDown = content.Load("player-dive-down")
+                keeperDiveUp = content.Load("keeper-up-dive-right")
+                keeperDiveDown = content.Load("keeper-down-dive-right")
                 whiteLine = content.Load("white")
                 ballKick = content.Load("ball-kick")
             }
