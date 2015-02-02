@@ -40,7 +40,6 @@ type Resources =
         playerJumpRight : Texture2D
         keeperDiveUp : Texture2D
         keeperDiveDown : Texture2D
-//        playerShadows : Texture2D
         whiteLine : Texture2D
         ballKick : SoundEffect
     }
@@ -295,10 +294,8 @@ let discretizeTrigo x =
     else
         sx
 
-// Active pattern that identified the strip direction rotation in 45-deg increments.
-// The returned angle is expressed in radians.
-// match (dirX, dirY) with Dig90 rotationAngle -> ...
-let (|Dir0|Dir90|Dir180|) (x, y) =
+/// Get the strip, rotation and horizontal mirror for a given direction.
+let getSpriteEffects (x, y) =
     let (|Pos|Neg|Zero|) x =
         if x = 0.0f then
             Zero
@@ -308,15 +305,15 @@ let (|Dir0|Dir90|Dir180|) (x, y) =
             Pos
 
     match (discretizeTrigo x, discretizeTrigo y) with
-    | Pos, Zero -> Dir90 0.0f
-    | Neg, Zero -> Dir90 π
-    | Zero, Pos -> Dir180 0.0f
-    | Zero, Neg -> Dir0 0.0f
-    | Pos, Pos -> Dir180 (π/4.0f)
-    | Pos, Neg -> Dir0 (-π/4.0f)
-    | Neg, Pos -> Dir180 (-π/4.0f)
-    | Neg, Neg -> Dir0 (π/4.0f)
-    | Zero, Zero -> Dir0 0.0f
+    | Pos, Zero -> Right, 0.0f, SpriteEffects.None
+    | Neg, Zero -> Right, 0.0f, SpriteEffects.FlipHorizontally
+    | Zero, Pos -> Down, 0.0f, SpriteEffects.None
+    | Zero, Neg -> Up, 0.0f, SpriteEffects.None
+    | Pos, Pos -> Down, (π/4.0f), SpriteEffects.None
+    | Pos, Neg -> Up, (π/4.0f), SpriteEffects.FlipHorizontally
+    | Neg, Pos -> Down, (π/4.0f), SpriteEffects.FlipHorizontally
+    | Neg, Neg -> Up, (π/4.0f), SpriteEffects.None
+    | Zero, Zero -> Up, 0.0f, SpriteEffects.None
 
 // Identify the sprite strip based on the activity of a player.
 let (|Running|Jumping|Tackling|Diving|) =
@@ -367,12 +364,10 @@ let renderSprites
             let y = player.pos.Y
             let x, y = worldToScreen (x, y)
             let w = 2.0f * playerRadius * ratio |> int
-            let stripDirection, angle =
-                match player.activity, (player.direction.X, player.direction.Y) with
-                | Diving, _ -> StripDirection.Right, 0.0f
-                | _, Dir90 angle -> StripDirection.Right, angle
-                | _, Dir180 angle -> StripDirection.Down, angle
-                | _, Dir0 angle -> StripDirection.Up, angle
+            let stripDirection, angle, effect =
+                match player.activity, getSpriteEffects (player.direction.X, player.direction.Y) with
+                | Diving, (_, _, fx) -> StripDirection.Right, 0.0f, fx
+                | _, x -> x
             let strip =
                 match player.activity, stripDirection with
                 | Running, StripDirection.Right -> resources.playerRunRight
