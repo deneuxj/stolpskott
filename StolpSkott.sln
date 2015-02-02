@@ -1,6 +1,10 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "XnaUtil projects", "XnaUtil projects", "{A6E7A716-6A6D-4775-8BFF-42D6B5E79350}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StolpSkott", "StolpSkott\StolpSkott\StolpSkott.csproj", "{4215AA3D-9F4E-4128-903F-F4CF87E53B96}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StolpSkottContent", "StolpSkott\StolpSkottContent\StolpSkottContent.contentproj", "{911F13A4-DCB1-4256-9981-4C263BC2D653}"
@@ -10,8 +14,6 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "XNAUtils", "..\xnautils\XNAUtils\XNAUtils.fsproj", "{EBFAB7EB-FF0B-4DE3-842B-BAB06DCD3D42}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Core", "..\xnautils\Core\Core.fsproj", "{CBFF8E99-B91A-4ADC-A0AD-502616413116}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "XnaUtil projects", "XnaUtil projects", "{A6E7A716-6A6D-4775-8BFF-42D6B5E79350}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "CoopMultiTasking", "..\xnautils\CoopMultiTasking\CoopMultiTasking.fsproj", "{7BDE5138-FF45-40C3-AD86-7C614B7AD779}"
 EndProject
@@ -48,8 +50,8 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{CBFF8E99-B91A-4ADC-A0AD-502616413116} = {A6E7A716-6A6D-4775-8BFF-42D6B5E79350}
 		{EBFAB7EB-FF0B-4DE3-842B-BAB06DCD3D42} = {A6E7A716-6A6D-4775-8BFF-42D6B5E79350}
+		{CBFF8E99-B91A-4ADC-A0AD-502616413116} = {A6E7A716-6A6D-4775-8BFF-42D6B5E79350}
 		{7BDE5138-FF45-40C3-AD86-7C614B7AD779} = {A6E7A716-6A6D-4775-8BFF-42D6B5E79350}
 	EndGlobalSection
 EndGlobal
