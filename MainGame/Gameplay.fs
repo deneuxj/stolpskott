@@ -419,7 +419,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
             let radarH = viewPortH * radarFactor
             let radarW = radarH * (!state).pitch.width / (!state).pitch.length
             let radarSize = (radarW, radarH)
-            Rendering.render spriteBatch (viewW, viewH) textures !state radarPos radarSize
+            Rendering.render spriteBatch (viewW, viewH) textures !state radarPos radarSize highlights
         | _ -> ()
 
         match spriteBatch.Value, font.Value with
