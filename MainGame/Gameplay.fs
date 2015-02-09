@@ -241,6 +241,7 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                 keeperDiveDown = content.Load("keeper-down-dive-right")
                 whiteLine = content.Load("white")
                 ballKick = content.Load("ball-kick")
+                colorChange = content.Load("ColorChange")
             }
         spriteBatch :=
             Some (new Graphics.SpriteBatch(this.GraphicsDevice))

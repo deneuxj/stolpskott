@@ -42,6 +42,7 @@ type Resources =
         keeperDiveDown : Texture2D
         whiteLine : Texture2D
         ballKick : SoundEffect
+        colorChange : Effect;
     }
 
 // Ratio pixels/world length units
@@ -307,12 +308,12 @@ let getSpriteEffects (x, y) =
     match (discretizeTrigo x, discretizeTrigo y) with
     | Pos, Zero -> Right, 0.0f, SpriteEffects.None
     | Neg, Zero -> Right, 0.0f, SpriteEffects.FlipHorizontally
-    | Zero, Pos -> Down, 0.0f, SpriteEffects.None
-    | Zero, Neg -> Up, 0.0f, SpriteEffects.None
-    | Pos, Pos -> Down, (π/4.0f), SpriteEffects.None
-    | Pos, Neg -> Up, (π/4.0f), SpriteEffects.FlipHorizontally
-    | Neg, Pos -> Down, (π/4.0f), SpriteEffects.FlipHorizontally
-    | Neg, Neg -> Up, (π/4.0f), SpriteEffects.None
+    | Zero, Pos -> Up, 0.0f, SpriteEffects.None
+    | Zero, Neg -> Down, 0.0f, SpriteEffects.None
+    | Pos, Pos -> Up, (π/4.0f), SpriteEffects.None
+    | Pos, Neg -> Down, -(π/4.0f), SpriteEffects.FlipHorizontally
+    | Neg, Pos -> Up, (π/4.0f), SpriteEffects.FlipHorizontally
+    | Neg, Neg -> Down, (π/4.0f), SpriteEffects.None
     | Zero, Zero -> Up, 0.0f, SpriteEffects.None
 
 // Identify the sprite strip based on the activity of a player.
@@ -357,7 +358,11 @@ let renderSprites
             let y = b.pos.Y + scaledRadius
             let x, y = worldToScreen (x, y)
             let w = 2.0f * scaledRadius * ratio |> int
-            sb.Draw(resources.ball, Rectangle(int x, int (y - elevation * b.pos.Z), w, w), Color.White)
+            try
+                sb.Begin()
+                sb.Draw(resources.ball, Rectangle(int x, int (y - elevation * b.pos.Z), w, w), Color.White)
+            finally
+                sb.End()
 
         | Player(player, side) ->
             let x = player.pos.X
@@ -379,23 +384,46 @@ let renderSprites
                 | Tackling, _ -> resources.playerTackle
                 | Diving, _ when Match.isTeamAttackingUp side period -> resources.keeperDiveUp
                 | Diving, _ -> resources.keeperDiveDown
-            let sw = 32
+            let sw = strip.Height
             let sx =
                 player.runningFrame * float32 strip.Width
-                |> (*) 32.0f
+                |> fun x -> x / (float32 sw)
                 |> truncate
-                |> fun x -> x / 32.0f
+                |> (*) (float32 sw)
                 |> int
                 |> min (strip.Width - sw)
-            sb.Draw(strip, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, 0, sw, sw)), Color.White, angle, Vector2(16.0f, 16.0f), SpriteEffects.None, 0.0f)
-
+            try
+                let effect = resources.colorChange
+                let shirtColor, shortColor =
+                    match player.isKeeper, side with
+                    | true, _ -> Color.LightPink, Color.DarkGray
+                    | false, Team.TeamA -> Color.Blue, Color.DarkBlue
+                    | false, Team.TeamB -> Color.Red, Color.DarkRed
+                effect.Parameters.["OldColor"].SetValue(Color(0, 0, 255, 255).ToVector4())
+                effect.Parameters.["NewColor"].SetValue(shirtColor.ToVector4())
+                effect.Parameters.["OldColor2"].SetValue(Color(0, 0, 113, 255).ToVector4())
+                effect.Parameters.["NewColor2"].SetValue(shortColor.ToVector4())
+                effect.Parameters.["SpriteSheet"].SetValue(strip)
+                sb.Begin(SpriteSortMode.Immediate, BlendState.AlphaBlend, SamplerState.PointClamp, DepthStencilState.Default, RasterizerState.CullNone, resources.colorChange)
+                let center = float32 sw / 2.0f
+                sb.Draw(strip, Rectangle(int x, int y, w, w), System.Nullable(Rectangle(sx, 0, sw, sw)), Color.White, angle, Vector2(center, center), SpriteEffects.None, 0.0f)
+            finally
+                sb.End()
         | GoalUpper ->
             let x, y = (-Physics.goalWidth / 2.0f, pitch.length / 2.0f) |> worldToScreen
-            sb.Draw(resources.goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
+            try
+                sb.Begin()
+                sb.Draw(resources.goalUpper, Vector2(x / 1.0f<px>, (y - 64.0f<px>) / 1.0f<px>), Color.White)
+            finally
+                sb.End()
 
         | GoalLower ->
             let x, y = (-Physics.goalWidth / 2.0f, -pitch.length / 2.0f) |> worldToScreen
-            sb.Draw(resources.goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
+            try
+                sb.Begin()
+                sb.Draw(resources.goalLower, Vector2(x / 1.0f<px>, (y - 33.0f<px>) / 1.0f<px>), Color.White)
+            finally
+                sb.End()
 
 // Render the shadow of the ball
 let renderBallShadow (sb : SpriteBatch) (viewWidth, viewHeight) shadow (viewX, viewY) (ballPos : TypedVector3<m>) =
@@ -448,6 +476,6 @@ let render (sb : SpriteBatch) viewSize resources (state : Match.MatchState) : un
         renderGrass sb viewSize resources.grassLight resources.grassDark viewPos
         renderLines sb viewSize resources.whiteLine state.pitch viewPos
         renderBallShadow sb viewSize resources.ballShadow viewPos state.ball.pos
-        renderSprites sb viewSize resources state.period state.pitch viewPos sprites
     finally
         sb.End()
+    renderSprites sb viewSize resources state.period state.pitch viewPos sprites
