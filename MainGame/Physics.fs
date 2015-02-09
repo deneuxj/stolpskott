@@ -19,8 +19,8 @@ let checkCollisionCylinderVsSphere
     (Sphere(pos2, radius2, vel2)) =
 
     let axis = length * axis
-    let cast (x : float32<'M>) = LanguagePrimitives.FloatWithMeasure<'M> (float x)
-    let tup (v : TypedVector3<'M>) = (cast v.X, cast v.Y, cast v.Z)
+    let inline cast (x : float32<'M>) = LanguagePrimitives.FloatWithMeasure<'M> (float x)
+    let inline tup (v : TypedVector3<'M>) = (cast v.X, cast v.Y, cast v.Z)
     match Collisions.CylinderSphere.computeCollisionTimes
             (tup pos1)
             (tup axis)
