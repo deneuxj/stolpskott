@@ -452,7 +452,7 @@ let renderHighlights (sb : SpriteBatch) (viewWidth, viewHeight) line highlights 
         sb.Draw(line, Rectangle(int x, int y, w, 2), color)
     
 // Render everything.
-let render (sb : SpriteBatch) viewSize resources (state : Match.MatchState) : unit =
+let render (sb : SpriteBatch) viewSize resources (state : Match.MatchState) radarPos radarSize : unit =
     let viewPos = 
         let viewX = state.ball.pos.X |> max (-state.pitch.width * 0.5f) |> min (state.pitch.width * 0.5f)
         let viewY = state.ball.pos.Y |> max (-state.pitch.length * 0.5f) |> min (state.pitch.length * 0.5f)
@@ -479,3 +479,10 @@ let render (sb : SpriteBatch) viewSize resources (state : Match.MatchState) : un
     finally
         sb.End()
     renderSprites sb viewSize resources state.period state.pitch viewPos sprites
+    try
+        sb.Begin()
+        let positionsA = state.teamA.onPitch |> Array.map (fun p -> p.pos)
+        let positionsB = state.teamB.onPitch |> Array.map (fun p -> p.pos)
+        renderRadar sb radarPos radarSize resources.whiteLine state.pitch positionsA positionsB state.ball.pos
+    finally
+        sb.End()

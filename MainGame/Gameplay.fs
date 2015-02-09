@@ -408,9 +408,18 @@ type MatchGameplay(game, content : Content.ContentManager, playerIndex, playerSi
                     [ player.pos.X, player.pos.Y ]
                 | None ->
                     []
-            let viewX = 1.0f<Rendering.px> * float32 base.GraphicsDevice.Viewport.Width / Rendering.ratio
-            let viewY = 1.0f<Rendering.px> * float32 base.GraphicsDevice.Viewport.Height / Rendering.ratio
-            Rendering.render spriteBatch (viewX, viewY) textures !state
+            let viewPortW = 1.0f<Rendering.px> * float32 base.GraphicsDevice.Viewport.Width
+            let viewPortH = 1.0f<Rendering.px> * float32 base.GraphicsDevice.Viewport.Height
+            let viewW = viewPortW / Rendering.ratio
+            let viewH = viewPortH / Rendering.ratio
+            let radarPos =
+                (base.GraphicsDevice.Viewport.TitleSafeArea.Left, base.GraphicsDevice.Viewport.TitleSafeArea.Top)
+                |> fun (x, y) -> 1.0f<Rendering.px> * float32 x, 1.0f<Rendering.px> * float32 y
+            let radarFactor = 0.3f
+            let radarH = viewPortH * radarFactor
+            let radarW = radarH * (!state).pitch.width / (!state).pitch.length
+            let radarSize = (radarW, radarH)
+            Rendering.render spriteBatch (viewW, viewH) textures !state radarPos radarSize
         | _ -> ()
 
         match spriteBatch.Value, font.Value with
